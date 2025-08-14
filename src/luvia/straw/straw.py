@@ -42,7 +42,7 @@ class Straw:
                 valid_words.append(filename.replace(".png", ""))
         elif not db_words:
             current_directory = os.path.dirname(os.path.abspath(__file__))
-            filedf = Path(current_directory) / 'straw/../data/greggs_metadata.tsv'
+            filedf = Path(current_directory) / '/../data/greggs_metadata.tsv'
             df_words = pd.read_csv(filedf, sep="\t")
             valid_words.extend(df_words["word"].tolist())
         elif isinstance(db_words, list):
