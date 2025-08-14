@@ -1,4 +1,4 @@
-from luvia.straw.model.model import ImageToText
+from LUVIA.src.luvia.straw.model.model import ImageToText
 from torch import nn
 import torch
 from tqdm import tqdm
@@ -75,7 +75,7 @@ class NeuralActions:
         return loss_train, loss_val
 
 if __name__== "__main__":
-    from luvia.straw.utils.data_utils import Shorthand_Dataset
+    from LUVIA.src.luvia.straw.utils.data_utils import Shorthand_Dataset
     from torch.utils.data import DataLoader
     import torch
 
