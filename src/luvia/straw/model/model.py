@@ -1,5 +1,7 @@
-from LUVIA.src.luvia.straw.model.encoder import CNNEncoder
-from LUVIA.src.luvia.straw.model.decoder import LSTMDecoder
+#from LUVIA.src.luvia.straw.model.encoder import CNNEncoder
+#from LUVIA.src.luvia.straw.model.decoder import LSTMDecoder
+from luvia.straw.model.encoder import CNNEncoder
+from luvia.straw.model.decoder import LSTMDecoder
 from torch import nn
 
 # Full Model

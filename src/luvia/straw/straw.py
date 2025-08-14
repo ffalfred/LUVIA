@@ -7,9 +7,13 @@ import pandas as pd
 import spacy
 from pathlib import Path
 
-from LUVIA.src.luvia.straw.model.model import ImageToText
-from LUVIA.src.luvia.straw.actions import NeuralActions
-from LUVIA.src.luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
+#from LUVIA.src.luvia.straw.model.model import ImageToText
+#from LUVIA.src.luvia.straw.actions import NeuralActions
+#from LUVIA.src.luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
+from luvia.straw.model.model import ImageToText
+from luvia.straw.actions import NeuralActions
+from luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
+
 
 class Straw:
 
@@ -42,7 +46,7 @@ class Straw:
                 valid_words.append(filename.replace(".png", ""))
         elif not db_words:
             current_directory = os.path.dirname(os.path.abspath(__file__))
-            filedf = Path(current_directory) / '/../data/greggs_metadata.tsv'
+            filedf = Path(current_directory) / '../data/greggs_metadata.tsv'
             df_words = pd.read_csv(filedf, sep="\t")
             valid_words.extend(df_words["word"].tolist())
         elif isinstance(db_words, list):
@@ -133,7 +137,8 @@ class Straw:
     
 
 if __name__== "__main__":
-    straw = Straw(db_words="../../../../data/gregg_definitive/")
+    straw = Straw()
+    exit()
 
     train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", metadata="../utils/greggs_metadata.tsv",
                                         subset='train', augmentation=True,

@@ -1,4 +1,6 @@
-from LUVIA.src.luvia.straw.model.model import ImageToText
+#from LUVIA.src.luvia.straw.model.model import ImageToText
+from luvia.straw.model.model import ImageToText
+
 from torch import nn
 import torch
 from tqdm import tqdm
