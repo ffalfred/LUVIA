@@ -63,8 +63,6 @@ class NeuralActions:
                                                         mode="beam")
                             decoded = ''.join([inv_vocab[idx.item()] for idx in prediction[0]])
                             target = ''.join([inv_vocab[idx.item()] for idx in captions[i] if idx.item() != pad_idx])
-                            #img_io.imshow(images[i].cpu().permute(1,2,0).numpy())
-                            #plt.show()
                             print(f"Target:    {target}")
                             print(f"Predicted: {decoded}")
                             print("-" * 40)

@@ -4,6 +4,7 @@ from tqdm import tqdm
 import difflib
 import os
 import spacy
+from pathlib import Path
 
 from LUVIA.src.luvia.straw.model.model import ImageToText
 from LUVIA.src.luvia.straw.actions import NeuralActions
@@ -27,10 +28,27 @@ class Straw:
         self.model = ImageToText(vocab_size=len(self.vocab_dict))
         self.model = self.model.to(device)
         self.device = device
-        self.valid_words = []
-        if db_words:
+        self.valid_words = Straw.load_valid_words(db_words=db_words)
+
+    @staticmethod
+    def load_valid_words(db_words):
+        valid_words = []
+        if os.path.isfile(db_words):
+            df_words = pd.read_csv(db_words, sep="\t")
+            valid_words.extend(df_words["word"].tolist())
+        elif os.path.isdir(db_words):
             for filename in os.listdir(db_words):
-                self.valid_words.append(filename.replace(".png", ""))
+                valid_words.append(filename.replace(".png", ""))
+        elif not db_words:
+            current_directory = os.path.dirname(os.path.abspath(__file__))
+            filedf = Path(current_directory) / 'straw/../data/greggs_metadata.tsv'
+            df_words = pd.read_csv(filedf, sep="\t")
+            valid_words.extend(df_words["word"].tolist())
+        elif isinstance(db_words, list):
+            valid_words.extend(db_words)
+        else:
+            raise ValueError("DB_words is not valid")
+        return valid_words
 
 
     def load_dataset(self, folder, subset, metadata, num_workers=8, batch_size=64, augmentation=False, freqw_file=None):
