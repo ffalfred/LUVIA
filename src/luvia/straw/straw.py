@@ -5,9 +5,9 @@ import difflib
 import os
 import spacy
 
-from luvia.straw.model.model import ImageToText
-from luvia.straw.actions import NeuralActions
-from luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
+from LUVIA.src.luvia.straw.model.model import ImageToText
+from LUVIA.src.luvia.straw.actions import NeuralActions
+from LUVIA.src.luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
 
 class Straw:
 
