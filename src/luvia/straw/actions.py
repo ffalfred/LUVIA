@@ -49,7 +49,6 @@ class NeuralActions:
                 for batch_idx, (images, transcr, split_transcr, captions, len_transcr) in tqdm(enumerate(val_loader)):
                     images = images.to(device)
                     captions = captions.to(device)
-                    print("VAL1", images.shape)
                     outputs = model(images, captions[:, :-1])
                     targets = captions[:, 1:]
 
@@ -59,7 +58,6 @@ class NeuralActions:
                     # Show a few predictions
                     if batch_idx == 0:
                         for i in range(min(3, images.size(0))):
-                            print("VAL", images[i].shape)
                             prediction = model.infer(image=images[i], start_token=vocab['<START>'],
                                                         end_token=vocab['<END>'], beam_width=3, max_len=max_len, length_norm=True,
                                                         mode="beam")

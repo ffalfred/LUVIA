@@ -1,0 +1,37 @@
+Tag	Meaning	Example	General
+CC	Coordinating conjunction	and, but, or	CC
+CD	Cardinal number	one, two, 3.14  Number	-
+DT	Determiner	the, a, an, this    Determiner	DT
+EX	Existential there	there (as in “there is”)	EX         
+FW	Foreign word	c’est la vie	-
+IN	Preposition or subordinating conjunction	in, of, like, although	IN
+JJ	Adjective	big, blue, quick	JJ
+JJR	Adjective, comparative	bigger, faster	JJ
+JJS	Adjective, superlative	biggest, fastest	JJ
+LS	List item marker	1), A.	-
+MD	Modal	can, should, will	MD
+NN	Noun, singular or mass	dog, music	NOUN
+NNS	Noun, plural	dogs, songs	NOUN
+NNP	Proper noun, singular	Alfred,Denmark	NOUN
+NNPS	Proper noun, plural	Americans, Beatles	NOUN
+PDT	Predeterminer	all, both (in “all the kids”)	DT
+POS	Possessive ending	’s	-
+PRP	Personal pronoun	I, you, he, she	PRP
+PRP$	Possessive pronoun	my, your, his	PRP
+RB	Adverb	quickly, never	RB
+RBR	Adverb, comparative	faster, better	RB
+RBS	Adverb, superlative	fastest, best	RB
+RP	Particle	up, off (in “give up”)	RB
+SYM	Symbol	$, %, +	-
+TO	to	to (as in “to go”)	TO
+UH	Interjection	oh, wow, huh	-
+VB	Verb, base form	run, eat	VERB
+VBD	Verb, past tense	ran, ate	VERB
+VBG	Verb, gerund/present participle	running, eating	VERB
+VBN	Verb, past participle	run, eaten	VERB
+VBP	Verb, non-3rd person singular present	run, eat	VERB
+VBZ	Verb, 3rd person singular present	runs, eats	VERB
+WDT	Wh-determiner	which, that	DT
+WP	Wh-pronoun	who, what	PRP
+WP$	Possessive wh-pronoun	whose	PRP
+WRB	Wh-adverb	where, when, why	RB

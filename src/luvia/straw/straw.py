@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 import difflib
 import os
@@ -33,7 +33,7 @@ class Straw:
                 self.valid_words.append(filename.replace(".png", ""))
 
 
-    def load_dataset(self, folder, subset, num_workers=8, batch_size=64, augmentation=False):
+    def load_dataset(self, folder, subset, metadata, num_workers=8, batch_size=64, augmentation=False, freqw_file=None):
         if augmentation:
             aug_transforms = Shorthand_Dataset.augmentation_functions()
         else:
@@ -42,14 +42,17 @@ class Straw:
             rnd_subset = False
         else:
             rnd_subset = True
-        dataset = Shorthand_Dataset(basefolder=folder, subset=subset, max_length=Straw.maxlen_word,
+        dataset = Shorthand_Dataset(basefolder=folder, subset=subset, metadata=metadata, max_length=Straw.maxlen_word,
                                         rnd_subset=rnd_subset, transforms=aug_transforms)
+        weights = dataset.create_weights(freqw_file)
+
+        sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
         if subset == "infer":
             shuffle = False
         else:
             shuffle = True
-        set_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
-                                    collate_fn=Shorthand_Dataset.pad_collate)
+        set_loader = DataLoader(dataset, batch_size=batch_size, num_workers=num_workers,
+                                    collate_fn=Shorthand_Dataset.pad_collate, sampler=sampler)
         return set_loader
 
     def load_data(self, files):
@@ -111,14 +114,16 @@ class Straw:
     
 
 if __name__== "__main__":
-    straw = Straw(db_words="../../../data/gregg_definitive/")
+    straw = Straw(db_words="../../../../data/gregg_definitive/")
 
-    #train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='train', augmentation=True)
-    #val_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='val')
+    train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", metadata="../utils/greggs_metadata.tsv",
+                                        subset='train', augmentation=True,
+                                        freqw_file="../utils/general_POS_freq_speak.txt")
+    val_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='val', metadata="../utils/greggs_metadata.tsv",)
 
-    #straw.train_model(train_loader=train_loader, val_loader=val_loader, epochs=15)
-    #exit()
-    #straw.save_model(path="./weights/try1.pt")
+    straw.train_model(train_loader=train_loader, val_loader=val_loader, epochs=60)
+    straw.save_model(path="./weights/weights_speakcorpus_e60.pt")
+    exit()
     straw.load_model(path="./straw/weights/try1.pt")
     dataloader = straw.load_data(["../../../data/gregg_definitive/incentive.png", "../../../data/gregg_definitive/seemingly.png",
                                     "../../../data/gregg_definitive/miner.png"])

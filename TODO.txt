@@ -1,3 +1,5 @@
 # Add faster reader images (cv2)
 # generate_topk_topp_sampling
 # parallel decoding
+# British POS tags corpus
+# analysis conjunctions/determinants

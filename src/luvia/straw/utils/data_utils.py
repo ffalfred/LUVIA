@@ -6,7 +6,7 @@ from skimage.transform import resize
 import skimage.io as img_io
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torch.nn.utils.rnn import pad_sequence
 
 import albumentations as A
@@ -49,7 +49,7 @@ class Shorthand_Data(Dataset):
 
 class Shorthand_Dataset(Dataset):
 
-    def __init__(self, basefolder: str = 'IAM/', subset: str = 'train', fixed_size=(48, 56), 
+    def __init__(self, basefolder: str = 'IAM/', metadata:str = None, subset: str = 'train', fixed_size=(48, 56), 
                     transforms: list = None, character_classes: list = None, max_length = 21, rnd_subset = False):
 
         self.basefolder = basefolder
@@ -69,6 +69,10 @@ class Shorthand_Dataset(Dataset):
         self.char_to_num, self.num_to_char = self.create_dicts()
 
         self.data = pd.DataFrame(data,columns=["img_path", "word"])
+
+        if metadata is not None:
+            metadata = pd.read_csv(metadata, sep="\t")
+            self.data = self.data.merge(metadata, on="word")
         self.data  = self.data.sample(frac=1).reset_index(drop=True)
 
         if rnd_subset:
@@ -81,14 +85,30 @@ class Shorthand_Dataset(Dataset):
             continue
           transcr = filename.replace('.png', '')
           data += [(os.path.join(self.basefolder, filename), transcr)]
-
-
         return data
 
     def create_dicts(self):
         char_to_num = {c:(i) for i,c in enumerate(self.character_classes)}
         num_to_char = {(i):c for i,c in enumerate(self.character_classes)}
         return char_to_num, num_to_char
+
+    def create_weights(self, file_freq=None):
+        cols = ["Noun","Verb","Adjective","Adverb","Preposition","Foreign","Pronoun","Interjection",
+                "Conjunction","Determiner","Numeral","Particle","Other","Existential"]
+        if file_freq is not None:
+            freq_df = pd.read_csv(file_freq, sep="\t")
+            self.data["Frequency_POS"] = 0
+            self.data["Count_POS"] = self.data[cols].sum(axis=1)
+            for c in cols:
+                if c != "Particle":
+                    frequency = (self.data[c]*float(freq_df.loc[freq_df["General_POS"]==c, "Perc"].values[0]))/sum(self.data[c])
+                else:
+                    frequency = (self.data[c]*float(sorted(freq_df["Perc"])[0]))/sum(self.data[c])       
+                self.data["Frequency_POS"]+=frequency
+            self.data["Frequency_POS"] /= self.data["Count_POS"]
+            return self.data["Frequency_POS"]
+        else:
+            return [1]*len(self.data)
 
     def word_to_vec(self, word):
         return np.array([self.char_to_num[c] for c in word])
@@ -130,7 +150,7 @@ class Shorthand_Dataset(Dataset):
         spl_transcr = ["<START>"]+list(transcr)
         spl_transcr.append('<END>')
         int_transcr = self.word_to_vec(spl_transcr)
-
+        type_str = self.data.iloc[index]["GEN_POSTAGS"]
         return img, transcr, spl_transcr, torch.from_numpy(int_transcr), len(spl_transcr)
 
     def __len__(self):
@@ -220,14 +240,19 @@ class Shorthand_Dataset(Dataset):
 
 if __name__== "__main__":
     aug_transforms = Shorthand_Dataset.augmentation_functions()
-    train_create = Shorthand_Dataset(basefolder="../../../../data/gregg_definitive/", subset='train', 
-                                    max_length = 21, rnd_subset = False, transforms=aug_transforms)
+    train_create = Shorthand_Dataset(basefolder="../../../../../data/gregg_definitive/", metadata="../../utils/greggs_metadata.tsv",
+                                    subset='train', max_length = 21, rnd_subset = False, transforms=aug_transforms)
+    weights = train_create.create_weights("../../utils/general_POS_freq_speak.txt")
+
+    sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+
     train_loader = DataLoader(train_create, batch_size=64, shuffle=False, num_workers=8,
-                                    collate_fn=Shorthand_Dataset.pad_collate)
+                                    collate_fn=Shorthand_Dataset.pad_collate, sampler=sampler)
     for t in train_loader:
-        print(t[0].shape)
+        print(pd.Series(t[-1]).value_counts())
         break
-    datal = Shorthand_Data(["../../../../data/gregg_definitive/incentive.png", "../../../../data/gregg_definitive/seemingly.png",
+    exit()
+    datal = Shorthand_Data(["../../../../../data/gregg_definitive/incentive.png", "../../../../data/gregg_definitive/seemingly.png",
                                     "../../../../data/gregg_definitive/miner.png"])
     dataloader = DataLoader(datal, batch_size=64, num_workers=8, collate_fn=Shorthand_Data.collate)
     for da in dataloader:

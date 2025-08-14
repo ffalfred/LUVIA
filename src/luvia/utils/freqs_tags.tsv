@@ -1,0 +1,13 @@
+OS Tag	Description	Academic	Popular Writing	Spoken	Government Docs	Popular Lore	Fiction	Non-Fiction
+NOUN	Noun (singular and plural)	0.28	0.23	0.16	0.32	0.21	0.20	0.26
+JJ	Adjective	0.10	0.09	0.06	0.08	0.07	0.08	0.09
+RB	Adverb	0.05	0.07	0.10	0.04	0.08	0.08	0.06
+IN	Preposition or subordinating conj.	0.15	0.12	0.08	0.18	0.10	0.10	0.14
+DT	Determiner	0.10	0.11	0.12	0.09	0.11	0.11	0.10
+PRP	Personal pronoun	0.03	0.06	0.12	0.02	0.07	0.08	0.04
+CC	Coordinating conjunction	0.03	0.05	0.07	0.03	0.05	0.05	0.04
+TO	Infinitive marker 'to'	0.03	0.04	0.06	0.03	0.04	0.04	0.03
+MD	Modal (can, should, will)	0.02	0.03	0.06	0.02	0.03	0.03	0.02
+UH	Interjection	0.00	0.01	0.05	0.00	0.02	0.02	0.01
+EX	Existential there	0.01	0.01	0.01	0.02	0.01	0.01	0.01
+VERB	All verb forms	0.16	0.23	0.31	0.13	0.26	0.29	0.20

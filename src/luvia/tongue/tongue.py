@@ -52,6 +52,7 @@ class Tongue:
 
     @staticmethod
     def analyze_words(list_words):
+        lemmatizer = ntlk.WordNetLemmatizer()
         analysis = {}
         for word in list_words:
             synsets = wn.synsets(word)
@@ -79,18 +80,19 @@ class Tongue:
 
 if __name__== "__main__":
     list_words = []
- #   for filename in os.listdir("../../../data/gregg_definitive/"):
-  #      list_words.append(filename.replace(".png", ""))
-  #  analysis = Tongue.analyze_words(list_words)
-  #  forms = {"a":0, "s":0, "v":0, "n":0, "r":0, "Non":0}
-  #  for k, val in tqdm(analysis.items()):
-  #      if len(val["pos_tags"]) == 0:
-  #          forms["Non"] += 1
-  #      else:
-   #         for key in forms:
-    #            if key in val:
-     #               forms[key] += 1
-    #print(forms) 
+    for filename in os.listdir("../../../data/gregg_definitive/"):
+        list_words.append(filename.replace(".png", ""))
+    analysis = Tongue.analyze_words(list_words)
+    forms = {"a":0, "s":0, "v":0, "n":0, "r":0, "Non":0}
+    for k, val in tqdm(analysis.items()):
+        if len(val["pos_tags"]) == 0:
+            forms["Non"] += 1
+        else:
+            for key in forms:
+                if key in val:
+                    forms[key] += 1
+    print(forms) 
+    exit()
     word_buckets = [['content', 'connive','medication', 'dedication'],['fork', 'for', 'france', 'romance', 'france', 'performance'],
                     ['mother', 'smother', 'meter', 'meteor']]
     tongue = Tongue()

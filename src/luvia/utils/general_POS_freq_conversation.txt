@@ -1,0 +1,16 @@
+General_POS	Freq	Perc
+Verb	252702	0.252702
+Pronoun	165859	0.165859
+Noun	122530	0.12253
+Determiner	101834	0.101834
+Adverb	93009	0.093009
+Preposition	62724	0.062724
+Conjunction	50409	0.050409
+Interjection	48244	0.048244
+Adjective	34934	0.034934
+Other	24593	0.024593
+Negation	23767	0.023767
+Numeral	13672	0.013672
+Existential	3007	0.003007
+Symbol	2667	0.002667
+Foreign	49	4.9e-05
