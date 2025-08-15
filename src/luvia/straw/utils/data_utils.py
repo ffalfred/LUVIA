@@ -31,7 +31,7 @@ class Shorthand_Data(Dataset):
             img = Shorthand_Dataset.load_image(img_path)
         else:
             img = self.files[index]
-            img_path = None
+            img_path = "Character {}".format(index)
         img = self.std_image(img)
         return img, img_path
 
