@@ -21,7 +21,7 @@ class Shorthand_Data(Dataset):
     def std_image(self, img_path):
         fheight, fwidth = self.fixed_size[0], self.fixed_size[1]
  #       img = Shorthand_Dataset.load_image(img_path)
-        img = Shorthand_Dataset.preprocess(img, (fheight, fwidth))
+        img = Shorthand_Dataset.preprocess(img_path, (fheight, fwidth))
         img = torch.Tensor(img).float().unsqueeze(0)
         return img
 
