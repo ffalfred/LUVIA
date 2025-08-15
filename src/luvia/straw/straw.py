@@ -89,7 +89,7 @@ class Straw:
         vocab_inv_dict = {v: k for k, v in Straw.vocab_dict.items()}
         results = {}
 
-        for batch_idx, (images, paths) in tqdm(enumerate(dataloader)):
+        for batch_idx, (images, paths) in tqdm(enumerate(data_loader)):
             images = images.to(self.device)
             for i in range(len(images)):
                 results[paths[i]] = []
