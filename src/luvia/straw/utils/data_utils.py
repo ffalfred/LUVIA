@@ -18,16 +18,20 @@ class Shorthand_Data(Dataset):
         self.files = files
         self.fixed_size = fixed_size
 
-    def get_image(self, img_path):
+    def std_image(self, img_path):
         fheight, fwidth = self.fixed_size[0], self.fixed_size[1]
-        img = Shorthand_Dataset.load_image(img_path)
+ #       img = Shorthand_Dataset.load_image(img_path)
         img = Shorthand_Dataset.preprocess(img, (fheight, fwidth))
         img = torch.Tensor(img).float().unsqueeze(0)
         return img
 
     def __getitem__(self, index):
-        img_path = os.path.abspath(self.files[index])
-        img = self.get_image(img_path)
+        if isinstance(self.files[index], str):
+            img_path = os.path.abspath(self.files[index])
+            img = Shorthand_Dataset.load_image(img_path)
+        else:
+            img = self.files[index]
+        img = self.std_image(img)
         return img, img_path
 
     def __len__(self):
