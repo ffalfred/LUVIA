@@ -39,7 +39,8 @@ class Straw:
     def load_valid_words(db_words):
         valid_words = []
         if os.path.isfile(db_words):
-            df_words = pd.read_csv(db_words, sep="\t")
+            df_words = pd.read_csv(db_words, sep="\t", dtype={"word": str})
+            df_words.loc[df_words["word"].isna(), "word"] = "None"
             valid_words.extend(df_words["word"].tolist())
         elif os.path.isdir(db_words):
             for filename in os.listdir(db_words):
@@ -47,7 +48,8 @@ class Straw:
         elif not db_words:
             current_directory = os.path.dirname(os.path.abspath(__file__))
             filedf = Path(current_directory) / '../data/greggs_metadata.tsv'
-            df_words = pd.read_csv(filedf, sep="\t")
+            df_words = pd.read_csv(filedf, sep="\t", dtype={"word": str})
+            df_words.loc[df_words["word"].isna(), "word"] = "None"
             valid_words.extend(df_words["word"].tolist())
         elif isinstance(db_words, list):
             valid_words.extend(db_words)
@@ -138,17 +140,17 @@ class Straw:
 
 if __name__== "__main__":
     straw = Straw()
-    exit()
+#    exit()
 
-    train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", metadata="../utils/greggs_metadata.tsv",
-                                        subset='train', augmentation=True,
-                                        freqw_file="../utils/general_POS_freq_speak.txt")
-    val_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='val', metadata="../utils/greggs_metadata.tsv",)
-
-    straw.train_model(train_loader=train_loader, val_loader=val_loader, epochs=60)
-    straw.save_model(path="./weights/weights_speakcorpus_e60.pt")
-    exit()
-    straw.load_model(path="./straw/weights/try1.pt")
+ #   train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", metadata="../utils/greggs_metadata.tsv",
+  #                                      subset='train', augmentation=True,
+   #                                     freqw_file="../utils/general_POS_freq_speak.txt")
+#    val_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='val', metadata="../utils/greggs_metadata.tsv",)
+#
+ #   straw.train_model(train_loader=train_loader, val_loader=val_loader, epochs=60)
+  #  straw.save_model(path="./weights/weights_speakcorpus_e60.pt")
+   # exit()
+    straw.load_model(path="./data/weights/try1.pt")
     dataloader = straw.load_data(["../../../data/gregg_definitive/incentive.png", "../../../data/gregg_definitive/seemingly.png",
                                     "../../../data/gregg_definitive/miner.png"])
     results = straw.infer_model(dataloader, "diverse_beam", k=3)
