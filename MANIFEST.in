@@ -1,1 +1,1 @@
-recursive-include luvia/src/luvia/data *
+recursive-include src/luvia/data *
