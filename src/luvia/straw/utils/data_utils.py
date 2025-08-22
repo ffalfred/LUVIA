@@ -13,10 +13,15 @@ import albumentations as A
 
 class Shorthand_Data(Dataset):
 
-    def __init__(self, files, fixed_size=(48, 56)):
+    def __init__(self, files, fixed_size=(48, 56), transforms=None):
 
         self.files = files
         self.fixed_size = fixed_size
+        if transforms not None:
+            self.transforms = Shorthand_Dataset.augmentation_functions()
+        else:
+            self.transforms = transforms
+
 
     def std_image(self, img_path):
         fheight, fwidth = self.fixed_size[0], self.fixed_size[1]
@@ -33,6 +38,8 @@ class Shorthand_Data(Dataset):
             img = self.files[index]
             img_path = "Character {}".format(index)
         img = self.std_image(img)
+        if self.transforms is not None:
+            img = self.transforms(image=img)['image']
         return img, img_path
 
     def __len__(self):

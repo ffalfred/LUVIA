@@ -1,5 +1,17 @@
+[project]
+name = "luvia"
+version = "0.1.0"
+description = "LUVIA: Linguistic Understanding via Image Analysis"
+authors = [{ name = "Alfred Ferrer Florensa" }]
+readme = "README.md"
+requires-python = ">=3.11"
+
+
+[project.scripts]
+luvia = "luvia.main:main"
+
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 

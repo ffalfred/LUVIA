@@ -7,12 +7,12 @@ import pandas as pd
 import spacy
 from pathlib import Path
 
-#from LUVIA.src.luvia.straw.model.model import ImageToText
-#from LUVIA.src.luvia.straw.actions import NeuralActions
-#from LUVIA.src.luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
 from luvia.straw.model.model import ImageToText
 from luvia.straw.actions import NeuralActions
 from luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
+from luvia.straw.postprocessing import DistancePOS
+
+from luvia.straw.model.encoder import GuidedBackpropModel
 
 
 class Straw:
@@ -24,7 +24,7 @@ class Straw:
     maxlen_word = 21
 
 
-    def __init__(self, db_words=False, vocab_dict=None, device="cuda"):
+    def __init__(self, vocab_dict=None, device="cuda"):
 
         if vocab_dict is None:
             self.vocab_dict = Straw.vocab_dict
@@ -33,29 +33,6 @@ class Straw:
         self.model = ImageToText(vocab_size=len(self.vocab_dict))
         self.model = self.model.to(device)
         self.device = device
-        self.valid_words = Straw.load_valid_words(db_words=db_words)
-
-    @staticmethod
-    def load_valid_words(db_words):
-        valid_words = []
-        if os.path.isfile(db_words):
-            df_words = pd.read_csv(db_words, sep="\t", dtype={"word": str})
-            df_words.loc[df_words["word"].isna(), "word"] = "None"
-            valid_words.extend(df_words["word"].tolist())
-        elif os.path.isdir(db_words):
-            for filename in os.listdir(db_words):
-                valid_words.append(filename.replace(".png", ""))
-        elif not db_words:
-            current_directory = os.path.dirname(os.path.abspath(__file__))
-            filedf = Path(current_directory) / '../data/greggs_metadata.tsv'
-            df_words = pd.read_csv(filedf, sep="\t", dtype={"word": str})
-            df_words.loc[df_words["word"].isna(), "word"] = "None"
-            valid_words.extend(df_words["word"].tolist())
-        elif isinstance(db_words, list):
-            valid_words.extend(db_words)
-        else:
-            raise ValueError("DB_words is not valid")
-        return valid_words
 
 
     def load_dataset(self, folder, subset, metadata, num_workers=8, batch_size=64, augmentation=False, freqw_file=None):
@@ -80,12 +57,56 @@ class Straw:
                                     collate_fn=Shorthand_Dataset.pad_collate, sampler=sampler)
         return set_loader
 
-    def load_data(self, files):
+    def load_data(self, files, transform=True):
         data = Shorthand_Data(files)
         data_loader = DataLoader(data, batch_size=64, num_workers=8, collate_fn=Shorthand_Data.collate)
         return data_loader
 
-    def infer_model(self, data_loader, mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
+    @staticmethod
+    def occlusion_sensitivity(image_tensor, model, patch_size=8):
+        image_tensor = image_tensor.clone()
+        _, _, H, W = image_tensor.shape
+        sensitivity_map = torch.zeros(H, W)
+        base_output, _, _ = model(image_tensor)
+        base_score = base_output[0].sum().item()
+
+        for i in range(0, H, patch_size):
+            for j in range(0, W, patch_size):
+                occluded = image_tensor.clone()
+                occluded[0, 0, i:i+patch_size, j:j+patch_size] = 0
+                output, _, _ = model(occluded)
+                score = output[0].sum().item()
+                sensitivity_map[i:i+patch_size, j:j+patch_size] = base_score - score
+
+        return sensitivity_map
+
+
+    @staticmethod
+    def get_saliency_map(input_tensor, model):
+        # Saliency Map
+        input_tensor.requires_grad_()
+        output, _, _ = model(input_tensor)
+        score = output[0].sum()
+        score.backward()
+        saliency = input_tensor.grad.data.abs().squeeze().cpu()
+        return saliency
+
+    @staticmethod
+    def getguidedbackprop(input_tensor, model):
+        input_tensor.requires_grad_()
+        gb_model = GuidedBackpropModel(model)
+        output = gb_model(input_tensor)
+        score = output[0].sum()
+        # Safely zero gradients
+        if input_tensor.grad is not None:
+            input_tensor.grad.zero_()
+
+        score.backward()
+        gb_grad = input_tensor.grad.data.squeeze().cpu()
+        return gb_grad
+
+
+    def infer_model(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
                     diversity_strength=0.5, top_k=0, top_p=0.9, temperature=1.0, k=1):
 
         vocab_inv_dict = {v: k for k, v in Straw.vocab_dict.items()}
@@ -94,17 +115,28 @@ class Straw:
         for batch_idx, (images, paths) in tqdm(enumerate(data_loader)):
             images = images.to(self.device)
             for i in range(len(images)):
-                results[paths[i]] = []
+                results[paths[i]] = {}
+                results[paths[i]]["output"] = []
 
-                output = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],
-                                    beam_width=beam_width, max_len=Straw.maxlen_word, length_norm=length_norm, mode=mode,
+                output, act1, act2 = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],
+                                    beam_width=beam_width, max_len=Straw.maxlen_word, length_norm=length_norm, mode=infer_mode,
                                     num_groups=num_groups, diversity_strength=diversity_strength, top_k=top_k, top_p=top_p, temperature=temperature,
                                     k=k)
+                results[paths[i]]["act1"] = act1.cpu().detach().numpy()
+                results[paths[i]]["act2"] = act2.cpu().detach().numpy()
+                results[paths[i]]["conv1"] =self.model.encoder.conv1.weight
+                results[paths[i]]["conv2"] =self.model.encoder.conv2.weight
+                saliency = Straw.get_saliency_map(images[i].unsqueeze(0), self.model.encoder)
+                sensitivity = Straw.occlusion_sensitivity(images[i].unsqueeze(0), self.model.encoder)
+                gb_grad = Straw.getguidedbackprop(images[i].unsqueeze(0), self.model.encoder)
+                results[paths[i]]["saliency"] = saliency
+                results[paths[i]]["sensitivity"] = sensitivity
+                results[paths[i]]["gb_grad"] = gb_grad
                 output = output
                 for out in output:
                     out = out.cpu()
                     decoded = ''.join([vocab_inv_dict[idx.item()] for idx in out[:-1]])
-                    results[paths[i]].append(decoded)
+                    results[paths[i]]["output"].append(decoded)
         return results
 
     def distance_annotations(self, candidates, n=1):
@@ -142,14 +174,14 @@ if __name__== "__main__":
     straw = Straw()
 #    exit()
 
- #   train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", metadata="../utils/greggs_metadata.tsv",
-  #                                      subset='train', augmentation=True,
-   #                                     freqw_file="../utils/general_POS_freq_speak.txt")
-#    val_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='val', metadata="../utils/greggs_metadata.tsv",)
+    #train_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", metadata="../data/greggs_metadata.tsv",
+    #                                    subset='train', augmentation=True,
+   #                                     freqw_file="../../../data/general_POS/general_POS_freq_speak.txt")
+ #   val_loader = straw.load_dataset(folder="../../../../data/gregg_definitive/", subset='val', metadata="../data/greggs_metadata.tsv",)
 #
- #   straw.train_model(train_loader=train_loader, val_loader=val_loader, epochs=60)
-  #  straw.save_model(path="./weights/weights_speakcorpus_e60.pt")
-   # exit()
+  #  straw.train_model(train_loader=train_loader, val_loader=val_loader, epochs=60)
+   # straw.save_model(path="../data/weights/weights2_speakcorpus_e60.pt")
+    #exit()
     straw.load_model(path="./data/weights/try1.pt")
     dataloader = straw.load_data(["../../../data/gregg_definitive/incentive.png", "../../../data/gregg_definitive/seemingly.png",
                                     "../../../data/gregg_definitive/miner.png"])

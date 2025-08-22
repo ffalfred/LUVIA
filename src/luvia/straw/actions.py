@@ -27,7 +27,7 @@ class NeuralActions:
 
                 optimizer.zero_grad()
 
-                outputs = model(images, captions[:, :-1])  # input: all but last
+                outputs, act1, act2 = model(images, captions[:, :-1])  # input: all but last
                 targets = captions[:, 1:]                  # target: all but first
 
                 loss = criterion(outputs.reshape(-1, outputs.size(-1)), targets.reshape(-1))
@@ -51,7 +51,7 @@ class NeuralActions:
                 for batch_idx, (images, transcr, split_transcr, captions, len_transcr) in tqdm(enumerate(val_loader)):
                     images = images.to(device)
                     captions = captions.to(device)
-                    outputs = model(images, captions[:, :-1])
+                    outputs, act1, act2 = model(images, captions[:, :-1])
                     targets = captions[:, 1:]
 
                     loss = criterion(outputs.reshape(-1, outputs.size(-1)), targets.reshape(-1))
@@ -60,7 +60,7 @@ class NeuralActions:
                     # Show a few predictions
                     if batch_idx == 0:
                         for i in range(min(3, images.size(0))):
-                            prediction = model.infer(image=images[i], start_token=vocab['<START>'],
+                            prediction, act1, act2 = model.infer(image=images[i], start_token=vocab['<START>'],
                                                         end_token=vocab['<END>'], beam_width=3, max_len=max_len, length_norm=True,
                                                         mode="beam")
                             decoded = ''.join([inv_vocab[idx.item()] for idx in prediction[0]])

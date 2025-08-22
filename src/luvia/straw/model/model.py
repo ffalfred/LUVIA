@@ -13,12 +13,12 @@ class ImageToText(nn.Module):
         self.decoder = LSTMDecoder(encoded_dim, hidden_dim, vocab_size)
 
     def forward(self, images, captions):
-        features = self.encoder(images)
-        return self.decoder(features, captions)
+        features, act1, act2 = self.encoder(images)
+        return self.decoder(features, captions), act1, act2
 
     def infer(self, image, start_token, end_token, max_len=21, mode="vanilla", beam_width=3, length_norm=True,
                 num_groups=3, diversity_strength=0.5, top_k=0, top_p=0.9, temperature=1.0, k=1):
-        features = self.encoder(image.unsqueeze(0))
+        features, act1, act2 = self.encoder(image.unsqueeze(0))
         if mode == "vanilla":
             infer_result = self.infer_vanilla(features, start_token, end_token, max_len=max_len)
         elif mode == "beam":
@@ -34,7 +34,7 @@ class ImageToText(nn.Module):
                                                 temperature=temperature, k=k)
         else:
             raise ValueError("Mode {} is not coded yet".format(mode))
-        return infer_result
+        return infer_result, act1, act2
 
     def infer_vanilla(self, features, start_token, end_token, max_len=21):
         return self.decoder.generate(features, start_token, end_token, max_len)
