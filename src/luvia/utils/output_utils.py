@@ -5,6 +5,21 @@ import matplotlib.pyplot as plt
 import uuid
  
 
+from fpdf import FPDF
+
+class LUVIAReport(FPDF):
+
+    def header(self):
+        self.set_font("Arial", 'B', 12)
+        self.cell(0, 10, "LUVIA SYSTEM REPORT", ln=True, align="C")
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Arial", 'I', 8)
+        self.cell(0, 10, f"Page {self.page_no()}", align="C")
+
+
+
 
 class OutUtils:
 
@@ -163,3 +178,19 @@ class OutUtils:
         plt.close()
 
 
+    def create_pdfresults(self, list_sentences):
+        pdf = LUVIAReport()
+        pdf.add_page()
+        pdf.set_font("Courier", size=10)
+        pdf.set_text_color(22, 47, 72)  # Deep Blue
+
+        pdf.multi_cell(0, 10, "ABSTRACT:\nThis document outlines the inference results of the LUVIA system applied to your streets.")
+
+        pdf.set_text_color(184, 55, 74)  # Red
+        pdf.cell(0, 10, "RESULTS:", ln=True)
+        # Body text
+        pdf.set_font("Arial", '', 12)
+        for sentence in list_sentences:
+            pdf.multi_cell(0, 10, sentence)
+
+        pdf.output("{}/luvia_report.pdf".format(self.output_folder))

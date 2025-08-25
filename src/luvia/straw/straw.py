@@ -6,11 +6,12 @@ import os
 import pandas as pd
 import spacy
 from pathlib import Path
+import random
 
 from luvia.straw.model.model import ImageToText
 from luvia.straw.actions import NeuralActions
 from luvia.straw.utils.data_utils import Shorthand_Dataset, Shorthand_Data
-from luvia.straw.postprocessing import DistancePOS
+
 
 from luvia.straw.model.encoder import GuidedBackpropModel
 
@@ -23,9 +24,14 @@ class Straw:
                     'w': 25, 'x': 26, 'y': 27, 'z': 28}
     maxlen_word = 21
 
+    weights_model = {
+        "speak": "{}/../data/weights/weights2_speakcorpus_e60.pt".format(os.path.dirname(os.path.abspath(__file__)))
+        }
 
-    def __init__(self, vocab_dict=None, device="cuda"):
 
+    def __init__(self, vocab_dict=None):
+        
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if vocab_dict is None:
             self.vocab_dict = Straw.vocab_dict
         else:
@@ -106,7 +112,7 @@ class Straw:
         return gb_grad
 
 
-    def infer_model(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
+    def infer_model_old(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
                     diversity_strength=0.5, top_k=0, top_p=0.9, temperature=1.0, k=1):
 
         vocab_inv_dict = {v: k for k, v in Straw.vocab_dict.items()}
@@ -117,7 +123,38 @@ class Straw:
             for i in range(len(images)):
                 results[paths[i]] = {}
                 results[paths[i]]["output"] = []
+                output, act1, act2 = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],
+                                    beam_width=beam_width, max_len=Straw.maxlen_word, length_norm=length_norm, mode=infer_mode,
+                                    num_groups=num_groups, diversity_strength=diversity_strength, top_k=top_k, top_p=top_p, temperature=temperature,
+                                    k=k)
+                results[paths[i]]["act1"] = act1.cpu().detach().numpy()
+                results[paths[i]]["act2"] = act2.cpu().detach().numpy()
+                results[paths[i]]["conv1"] =self.model.encoder.conv1.weight
+                results[paths[i]]["conv2"] =self.model.encoder.conv2.weight
+                saliency = Straw.get_saliency_map(images[i].unsqueeze(0), self.model.encoder)
+                sensitivity = Straw.occlusion_sensitivity(images[i].unsqueeze(0), self.model.encoder)
+                gb_grad = Straw.getguidedbackprop(images[i].unsqueeze(0), self.model.encoder)
+                results[paths[i]]["saliency"] = saliency
+                results[paths[i]]["sensitivity"] = sensitivity
+                results[paths[i]]["gb_grad"] = gb_grad
+                output = output
+                for out in output:
+                    out = out.cpu()
+                    decoded = ''.join([vocab_inv_dict[idx.item()] for idx in out[:-1]])
+                    results[paths[i]]["output"].append(decoded)
+        return results
 
+    def infer_model(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
+                    diversity_strength=0.5, top_k=0, top_p=0.9, temperature=1.0, k=1):
+
+        vocab_inv_dict = {v: k for k, v in Straw.vocab_dict.items()}
+        results = {}
+
+        for images, paths in tqdm(data_loader):
+            images = images.to(self.device)
+            for i in range(len(images)):
+                results[paths[i]] = {}
+                results[paths[i]]["output"] = []
                 output, act1, act2 = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],
                                     beam_width=beam_width, max_len=Straw.maxlen_word, length_norm=length_norm, mode=infer_mode,
                                     num_groups=num_groups, diversity_strength=diversity_strength, top_k=top_k, top_p=top_p, temperature=temperature,
@@ -166,8 +203,17 @@ class Straw:
     def save_model(self, path):
         torch.save(self.model.state_dict(), path)
     
-    def load_model(self, path):
-        self.model.load_state_dict(torch.load(path, weights_only=True))
+
+    def load_model(self, model_weights=False):
+        if os.path.isfile(model_weights):
+            path_weight = model_weights
+        else:
+            if model_weights == "random":
+                path_weight = random.choice(list(Straw.weights_model.items()))[1]
+            else:
+                path_weight = Straw.weights_model[model_weights]
+        self.model.load_state_dict(torch.load(path_weight, map_location=self.device,
+                                              weights_only=True))
     
 
 if __name__== "__main__":

@@ -18,7 +18,8 @@ class LUVIAargs():
                 "straw": ["weights", "infer_mode", "length_norm", "beam_width",
                         "num_groups", "diversity_strength", "top_k", "top_p",
                         "temperature", "k", "notransform_input"],
-                "tongue": []
+                "tongue": ["dictionary", "character", "corrected_k", "sel_sentence",
+                           "final_sentences","quantile"]
                 }
 
 
@@ -29,87 +30,108 @@ class LUVIAargs():
         general.add_argument("-i", "--input", help="Input file")
         general.add_argument("-o", "--output", help="Output folder")
         general.add_argument("--clean_mode", choices=["OTSA", "simple", False], default="OTSA")
-        general.add_argument("--rotate_img", default=-90)
+        general.add_argument("--rotate_img", default=-90, type=float)
         general.add_argument("-v", "--verbose", action="store_true", help="Enable verbose mode")
 
     @staticmethod
     def clean_args(parser):
         clean = parser.add_argument_group("Clean Image Settings")      
-        clean.add_argument("--blur_kernel", default=(5, 5), nargs=2, type=int,
-                            metavar=("START", "END"),)
-        clean.add_argument("--blur_sigma", default=0)
-        clean.add_argument("--block_size", default=15)
-        clean.add_argument("--vthresh_C", default=3)
-        clean.add_argument("--min_area", default=20)
-        clean.add_argument("--max_area", default=2000)
-        clean.add_argument("--min_aspect", default=0.1)
-        clean.add_argument("--max_aspect", default=10.0)
-        clean.add_argument("--min_vertices", default=6)
+        clean.add_argument("--blur_kernel", default="5,5")
+        clean.add_argument("--blur_sigma", default=0, type=float)
+        clean.add_argument("--block_size", default=15, type=float)
+        clean.add_argument("--vthresh_C", default=3, type=float)
+        clean.add_argument("--min_area", default=20, type=float)
+        clean.add_argument("--max_area", default=2000, type=float)
+        clean.add_argument("--min_aspect", default=0.1, type=float)
+        clean.add_argument("--max_aspect", default=10.0, type=float)
+        clean.add_argument("--min_vertices", default=6, type=float)
 
-        clean.add_argument("--blur_kernel_size", default=5)
-        clean.add_argument("--canny_thresh1", default=50)
-        clean.add_argument("--canny_thresh2", default=150)
-        clean.add_argument("--cc_min_area", default=20)
-        clean.add_argument("--cc_max_area", default=2000)
-        clean.add_argument("--contour_min_area", default=20)
-        clean.add_argument("--contour_max_area", default=2000)
-        clean.add_argument("--contour_min_vertices", default=5)
-        clean.add_argument("--contour_max_vertices", default=0.001)    
+        clean.add_argument("--blur_kernel_size", default=5, type=float)
+        clean.add_argument("--canny_thresh1", default=50, type=float)
+        clean.add_argument("--canny_thresh2", default=150, type=float)
+        clean.add_argument("--cc_min_area", default=20, type=float)
+        clean.add_argument("--cc_max_area", default=2000, type=float)
+        clean.add_argument("--contour_min_area", default=20, type=float)
+        clean.add_argument("--contour_max_area", default=2000, type=float)
+        clean.add_argument("--contour_min_vertices", default=5, type=float)
+        clean.add_argument("--contour_max_vertices", default=0.001, type=float)    
 
     @staticmethod
     def hoofh_args(parser):
         hoofv = parser.add_argument_group("Hoof vertical Settings")
         hoofv.add_argument("--hoofh_mode", default="cca", choices=["cca", "threshold"])
         hoofv.add_argument("--filter_angle", default=False)
-        hoofv.add_argument("--min_area_segment", default=100)
-        hoofv.add_argument("--dilation_kernel", default=(90,10), nargs=2, type=int,
-                                            metavar=("START", "END"))
-        hoofv.add_argument("--angle_tolerance", default=15)
+        hoofv.add_argument("--min_area_segment", default=100, type=float)
+        hoofv.add_argument("--dilation_kernel", default="90,10")
+        hoofv.add_argument("--angle_tolerance", default=15, type=float)
         hoofv.add_argument("--filter_boxes", default="inside_box")
-        hoofv.add_argument("--kernel_size", default=(150,20), nargs=2, type=int,
-                                            metavar=("START", "END"))
-        hoofv.add_argument("--iterations", default=1)
+        hoofv.add_argument("--kernel_size", default="150,20")
+        hoofv.add_argument("--iterations", default=1, type=float)
 
 
 
     @staticmethod
     def hoofv_args(parser):
         hoofh = parser.add_argument_group("Hoof horizontal Settings")
-        hoofh.add_argument("--sigma", default=4)
-        hoofh.add_argument("--separation_char", default=5)
+        hoofh.add_argument("--sigma", default=4, type=float)
+        hoofh.add_argument("--separation_char", default=5, type=float)
 
     @staticmethod
     def tongue_args(parser):
-        pass
+        tongue = parser.add_argument_group("Tongue Settings")
+        tongue.add_argument("--dictionary",
+                            choices=[False, "vanilla", "equal_POS", "character_POS"], default="character_POS")
+        tongue.add_argument("--character", default="random")
+        tongue.add_argument("--corrected_k", default=5, type=int)
+        tongue.add_argument("--sel_sentence", choices=["random", "best", "quantile"], default="quantile")
+        tongue.add_argument("--quantile", choices=["5th", "10th", "25th", "50th", "75th",
+                                                   "90th", "95th", "100th"], default="5th")
+        tongue.add_argument("--final_sentences", default=2, type=int)
 
     @staticmethod
     def straw_args(parser):
         straw = parser.add_argument_group("Straw Settings")
-        straw.add_argument("--weights")
+        straw.add_argument("--weights", default="random")
         straw.add_argument("--infer_mode", default="diverse_beam")
-        straw.add_argument("--length_norm", default=True)
-        straw.add_argument("--beam_width", default=3)
-        straw.add_argument("--num_groups", default=3)
-        straw.add_argument("--diversity_strength", default=0.5)
-        straw.add_argument("--top_k", default=0)
-        straw.add_argument("--top_p", default=0.9)
-        straw.add_argument("--temperature", default=1.0)
-        straw.add_argument("--k", default=1)
-        straw.add_argument("--dictionary",
-                            choices=[False, "match", "POSmatch", "characters"], default=False)
+        straw.add_argument("--length_norm", action="store_true")
+        straw.add_argument("--beam_width", default=3, type=int)
+        straw.add_argument("--num_groups", default=3, type=int)
+        straw.add_argument("--diversity_strength", default=0.5, type=float)
+        straw.add_argument("--top_k", default=0, type=float)
+        straw.add_argument("--top_p", default=0.9, type=float)
+        straw.add_argument("--temperature", default=1.0, type=float)
+        straw.add_argument("--k", default=1, type=int)
         straw.add_argument("--notransform_input", action='store_false', default=True)
-        straw.add_argument("--character", default=False)
 
-
+    @staticmethod
     def extract_group_args(args, group_name):
         """Extract arguments from a specific group name."""
         keys = LUVIAargs.ARG_GROUPS.get(group_name, [])
         return {key: getattr(args, key, None) for key in keys}
+    
+    @staticmethod
+    def fix_doublevalue(argument):
+        arguments_split = argument.split(",")
+        argument_lst = []
+        for n in arguments_split:
+            argument_lst.append(int(n.strip()))
+        return tuple(argument_lst)
 
+    
+    @staticmethod
+    def fix_args(arguments_parse):
+        if hasattr(arguments_parse, "blur_kernel"):
+            arguments_parse.blur_kernel = LUVIAargs.fix_doublevalue(arguments_parse.blur_kernel)
+        if hasattr(arguments_parse, "dilation_kernel"):
+            arguments_parse.dilation_kernel = LUVIAargs.fix_doublevalue(arguments_parse.dilation_kernel)
+        if hasattr(arguments_parse, "kernel_size"):
+            arguments_parse.kernel_size = LUVIAargs.fix_doublevalue(arguments_parse.kernel_size)
+        return arguments_parse
 
     @staticmethod
     def main():
-        parser = argparse.ArgumentParser(description="Luvia animal")
+        parser = argparse.ArgumentParser(description="Luvia animal",
+                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         subparsers = parser.add_subparsers(dest="command", required=True)
         ## Main
@@ -143,6 +165,8 @@ class LUVIAargs():
         LUVIAargs.default_args(spial_parser)
 
 
-        return parser.parse_args()
+        arguments_parse = parser.parse_args()
+        arguments_parse = LUVIAargs.fix_args(arguments_parse)
+        return arguments_parse
 
 

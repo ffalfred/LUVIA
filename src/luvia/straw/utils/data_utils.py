@@ -17,7 +17,7 @@ class Shorthand_Data(Dataset):
 
         self.files = files
         self.fixed_size = fixed_size
-        if transforms not None:
+        if transforms is not None:
             self.transforms = Shorthand_Dataset.augmentation_functions()
         else:
             self.transforms = transforms

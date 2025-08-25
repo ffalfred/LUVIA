@@ -39,7 +39,7 @@ class Tongue:
         else:
             self.dictmatch_module = None
         self.match_mode = match_mode
-        self.max_length_structure = 10
+        self.max_length_structure = 7
 
     @staticmethod
     def load_valid_words(db_words):
@@ -104,7 +104,7 @@ class Tongue:
 
     @staticmethod
     def syntactic_score(sentence):
-        doc = nlp(sentence)
+        doc = self.nlp(sentence)
         pos_tags = [token.pos_ for token in doc]
         words = [token.text.lower() for token in doc]
 
@@ -138,7 +138,7 @@ class Tongue:
     def rerank_beam_search(candidates, syntax_weight=1.0):
         scored_candidates = []
         for sentence, log_likelihood in candidates:
-            syntax_score = syntactic_score(sentence)
+            syntax_score = Tongue.syntactic_score(sentence)
             combined_score = log_likelihood + syntax_weight * syntax_score
             scored_candidates.append((sentence, combined_score))
 
@@ -160,7 +160,7 @@ class Tongue:
 
     @staticmethod
     def analyze_words(list_words):
-        lemmatizer = ntlk.WordNetLemmatizer()
+        lemmatizer = self.ntlk.WordNetLemmatizer()
         analysis = {}
         for word in list_words:
             synsets = wn.synsets(word)
@@ -214,7 +214,17 @@ class Tongue:
             if len(structure) == length_sentence:
                 possible_structures.append(structure)
             elif length_sentence > self.max_length_structure and len(structure) == self.max_length_structure:
-                possible_structures.append(structure)
+                _structure = []
+                i = 0
+                j = 0
+                while True:
+                    _structure.append(structure[i])
+                    i += 1
+                    if i >= len(structure):
+                        i = 0
+                    if len(_structure) >= length_sentence:
+                        break
+                possible_structures.append(_structure)
             else:
                 continue
         structure_sel = random.choice(possible_structures)
@@ -278,7 +288,7 @@ class Tongue:
         corrected_batch = list(set(corrected_batch))
         return corrected_batch
 
-    def get_sentence(self, sentences, mode="best", k=1, quantile="10th"):
+    def get_sentence(self, sentences, mode="best", k=1, quantile="5th"):
         if mode == "random":
             sentences_meta = random.sample(sentences, k)
         elif mode == "best":
@@ -295,7 +305,7 @@ class Tongue:
                 "25th": (np.percentile(perplexity_values, 10), np.percentile(perplexity_values, 25)),
                 "50th": (np.percentile(perplexity_values, 25), np.percentile(perplexity_values, 50)),
                 "75th": (np.percentile(perplexity_values, 50), np.percentile(perplexity_values, 75)),
-                "90th": (np.percentile(perplexity_values, 75), np.percentile(perplexity_values, 90))
+                "90th": (np.percentile(perplexity_values, 75), np.percentile(perplexity_values, 90)),
                 "95th": (np.percentile(perplexity_values, 90), np.percentile(perplexity_values, 95)),
                 "100th": (np.percentile(perplexity_values, 95), np.percentile(perplexity_values, 100))}
             quantile_sel = quantiles[quantile]

@@ -163,7 +163,6 @@ class LSTMDecoder(nn.Module):
 
         # Final step: collect top sequences from all groups
         all_sequences = [(tokens, score) for group in beams for tokens, score, _, _ in group]
-
         # Sort and return top `num_outputs`
         sorted_sequences = sorted(all_sequences, key=lambda x: x[1] / len(x[0]) if length_norm else x[1],
                                     reverse=True)[:k]

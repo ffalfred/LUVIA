@@ -54,7 +54,6 @@ class Hoof_HThresh(Hoofs):
 
     @staticmethod
     def extract_lines(image, kernel_size=(50, 10), iterations=1):
-        print("KERNEL", kernel_size, "ITERATION", iterations)
         binary = Hoof_HThresh.apply_binary_threshold(image)
         dilated = Hoof_HThresh.apply_horizontal_dilation(binary, kernel_size=kernel_size,
                                                 iterations=iterations)
@@ -110,7 +109,6 @@ class ShorthandSegmenter:
                 # Skip boxes that are nearly the size of the image
                 if w >= img_width - 10 and h >= img_height - 10:
                     continue
-
             if area >= self.min_area:
                 cropped = original[y:y+h, x:x+w]
                 component_mask = np.zeros_like(binary)
@@ -295,6 +293,8 @@ class Hoof_VThresh:
         image_color = Hoof_VThresh.image_to_color(image)
         image_color = Hoof_VThresh.draw_minima_maxima(image_color, minima, maxima)
         characters = Hoof_VThresh.extract_regions(image, regions=minima)
+        if len(characters) == 0:
+            characters.append(image_binary)
         return image_color, characters, {
             "projection": smoothed_projection,
             "minima": minima,

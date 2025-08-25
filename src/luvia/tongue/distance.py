@@ -10,7 +10,8 @@ class DictMatch:
         "ADJ": "Adjective", "ADP": "Preposition", "ADV": "Adverb", "AUX": "Verb",
         "CONJ": "Conjunction", "CCONJ": "Conjunction", "DET":"Determiner", "NOUN": "Noun",
         "NUM": "Numeral", "PART": "Particle", "PRON": "Pronoun", "PROPN": "Noun",
-        "SCONJ": "Conjunction", "VERB": "Verb", "X": "Other", "MOD":"Verb", "PREP": "Preposition"}
+        "SCONJ": "Conjunction", "VERB": "Verb", "X": "Other", "MOD":"Verb", "PREP": "Preposition",
+        "REL": "Pronoun"}
 
     def __init__(self, db_words):
 
@@ -71,8 +72,6 @@ class DictMatch:
         # Filter dictionary by POS
         #candidates = [word for word, pos in tagged_dict.items() if pos == predicted_pos]
         if predicted_pos is not None:
-            print(predicted_pos)
-            print(DictMatch.spacy_to_general[predicted_pos])
             dictcandidates = self.valid_words.loc[self.valid_words[DictMatch.spacy_to_general[predicted_pos]]==1, "word"].tolist()
         else:
             print("NOOO")
