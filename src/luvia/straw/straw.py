@@ -64,7 +64,7 @@ class Straw:
         return set_loader
 
     def load_data(self, files, transform=True):
-        data = Shorthand_Data(files)
+        data = Shorthand_Data(files, transforms=transform)
         data_loader = DataLoader(data, batch_size=64, num_workers=8, collate_fn=Shorthand_Data.collate)
         return data_loader
 

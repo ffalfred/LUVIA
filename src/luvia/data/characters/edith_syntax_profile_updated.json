@@ -60,279 +60,47 @@
     ]
   },
   "templates": {
-    "simple_declaratives": [
-      [
-        "NOUN"
-      ],
-      [
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "VERB"
-      ],
-      [
-        "DET",
-        "ADJ",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "AUX",
-        "VERB"
-      ]
+    "compound_statements": [
+      ["VERB"],
+      ["PRON", "VERB"],
+      ["PRON", "VERB", "CONJ"],
+      ["PRON", "VERB", "CONJ", "PRON"],
+      ["PRON", "VERB", "CONJ", "PRON", "VERB"],
+      ["PRON", "VERB", "PREP", "NOUN", "CONJ", "VERB"],
+      ["PRON", "VERB", "PREP", "DET", "NOUN", "CONJ", "VERB"],
+      ["PRON", "VERB", "PREP", "DET", "ADJ", "NOUN", "CONJ", "VERB"],
+      ["PRON", "VERB", "PREP", "DET", "ADJ", "NOUN", "CONJ", "PRON", "VERB"],
+      ["PRON", "VERB", "PREP", "DET", "ADJ", "NOUN", "CONJ", "PRON", "VERB", "ADV"],
+      ["PRON", "VERB", "PREP", "DET", "ADJ", "NOUN", "CONJ", "PRON", "VERB", "ADV", "PREP"],
+      ["PRON", "VERB", "PREP", "DET", "ADJ", "NOUN", "CONJ", "PRON", "VERB", "ADV", "PREP", "NOUN"]
     ],
-    "passive_constructions": [
-      [
-        "DET",
-        "NOUN",
-        "AUX",
-        "VERB",
-        "PREP",
-        "DET",
-        "NOUN"
-      ],
-      [
-        "PRON",
-        "AUX",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "DET",
-        "ADJ",
-        "NOUN",
-        "AUX",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "NOUN",
-        "AUX",
-        "VERB",
-        "PREP",
-        "PRON"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "AUX",
-        "VERB",
-        "PREP",
-        "DET",
-        "NOUN"
-      ],
-      [
-        "ADV",
-        "DET",
-        "NOUN",
-        "AUX",
-        "VERB"
-      ]
+    "balanced_declaratives": [
+      ["PRON"],
+      ["PRON", "VERB"],
+      ["PRON", "MOD", "VERB"],
+      ["PRON", "VERB", "PREP", "NOUN"],
+      ["PRON", "VERB", "PREP", "DET", "NOUN"],
+      ["PRON", "VERB", "PREP", "DET", "ADJ", "NOUN"],
+      ["PRON", "MOD", "VERB", "PREP", "DET", "ADJ", "NOUN"],
+      ["PRON", "MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV"],
+      ["PRON", "MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ"],
+      ["PRON", "MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB"],
+      ["PRON", "MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP"],
+      ["PRON", "MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP", "NOUN"]
     ],
-    "relative_clauses": [
-      [
-        "DET",
-        "NOUN",
-        "REL",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "REL",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "VERB",
-        "DET",
-        "NOUN",
-        "REL",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB",
-        "PREP",
-        "DET",
-        "NOUN",
-        "REL",
-        "VERB"
-      ],
-      [
-        "DET",
-        "ADJ",
-        "NOUN",
-        "REL",
-        "AUX",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "PRON",
-        "VERB",
-        "DET",
-        "NOUN",
-        "REL",
-        "AUX",
-        "VERB"
-      ]
-    ],
-    "subordinate_clauses": [
-      [
-        "CONJ",
-        "PRON",
-        "VERB",
-        "DET",
-        "NOUN"
-      ],
-      [
-        "CONJ",
-        "PRON",
-        "AUX",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "CONJ",
-        "DET",
-        "NOUN",
-        "VERB",
-        "PREP",
-        "DET",
-        "NOUN"
-      ],
-      [
-        "CONJ",
-        "PRON",
-        "MOD",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "AUX",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "VERB"
-      ]
-    ],
-    "compound_sentences": [
-      [
-        "PRON",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB",
-        "CONJ",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "AUX",
-        "VERB",
-        "PREP",
-        "NOUN",
-        "CONJ",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB",
-        "CONJ",
-        "ADV",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB",
-        "PREP",
-        "NOUN",
-        "CONJ",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "MOD",
-        "VERB"
-      ]
-    ],
-    "inversion_emphasis": [
-      [
-        "ADV",
-        "AUX",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "MOD",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "DET",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "AUX",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ]
+    "instructional_tone": [
+      ["VERB"],
+      ["MOD", "VERB"],
+      ["MOD", "VERB", "PREP"],
+      ["MOD", "VERB", "PREP", "DET"],
+      ["MOD", "VERB", "PREP", "DET", "NOUN"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP", "DET"],
+      ["MOD", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP", "DET", "NOUN"]
     ]
   }
 }

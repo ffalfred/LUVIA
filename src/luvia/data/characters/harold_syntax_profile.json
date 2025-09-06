@@ -57,242 +57,48 @@
       "not"
     ]
   },
-  "templates": {
-    "simple_declaratives": [
-      [
-        "PRON",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "DET",
-        "ADJ",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ]
-    ],
-    "compound_sentences": [
-      [
-        "PRON",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB",
-        "CONJ",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "AUX",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB",
-        "CONJ",
-        "ADV",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "VERB",
-        "CONJ",
-        "PRON",
-        "MOD",
-        "VERB"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB",
-        "PREP",
-        "NOUN",
-        "CONJ",
-        "VERB"
-      ]
-    ],
-    "prepositional_phrases": [
-      [
-        "PRON",
-        "VERB",
-        "PREP",
-        "DET",
-        "NOUN"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "PRON",
-        "AUX",
-        "VERB",
-        "PREP",
-        "DET",
-        "NOUN"
-      ],
-      [
-        "DET",
-        "ADJ",
-        "NOUN",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ]
-    ],
-    "introductory_adverbials": [
-      [
-        "ADV",
-        "PRON",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "DET",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "MOD",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "DET",
-        "ADJ",
-        "NOUN",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ]
-    ],
-    "modal_constructions": [
-      [
-        "PRON",
-        "MOD",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "VERB",
-        "PREP",
-        "NOUN"
-      ],
-      [
-        "DET",
-        "NOUN",
-        "MOD",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "AUX",
-        "VERB"
-      ],
-      [
-        "ADV",
-        "PRON",
-        "MOD",
-        "VERB"
-      ],
-      [
-        "PRON",
-        "MOD",
-        "VERB",
-        "CONJ",
-        "VERB"
-      ]
-    ],
-    "short_fragments": [
-      [
-        "NOUN"
-      ],
-      [
-        "VERB"
-      ],
-      [
-        "ADV",
-        "VERB"
-      ],
-      [
-        "MOD",
-        "VERB"
-      ]
-    ]
-  }
+"templates": {
+  "passive_voice_formality": [
+    ["VERB"],
+    ["AUX", "VERB"],
+    ["DET", "NOUN", "VERB"],
+    ["DET", "NOUN", "AUX", "VERB"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP", "DET"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP", "DET", "NOUN"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ"],
+    ["DET", "ADJ", "NOUN", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB"]
+  ],
+  "complex_noun_phrases": [
+    ["NOUN"],
+    ["ADJ", "NOUN"],
+    ["DET", "ADJ", "NOUN"],
+    ["DET", "ADJ", "NOUN", "PREP"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "NOUN"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "ADJ", "NOUN"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "ADJ", "NOUN", "VERB"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "ADJ", "NOUN", "VERB", "ADV"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "ADJ", "NOUN", "VERB", "ADV", "PREP"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "ADJ", "NOUN", "VERB", "ADV", "PREP", "DET"],
+    ["DET", "ADJ", "NOUN", "PREP", "DET", "ADJ", "NOUN", "VERB", "ADV", "PREP", "DET", "NOUN"]
+  ],
+  "formal_declaratives": [
+    ["PRON"],
+    ["PRON", "VERB"],
+    ["PRON", "AUX", "VERB"],
+    ["PRON", "MOD", "VERB", "ADV"],
+    ["PRON", "AUX", "VERB", "PREP", "NOUN"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "NOUN"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP"],
+    ["PRON", "AUX", "VERB", "PREP", "DET", "ADJ", "NOUN", "ADV", "CONJ", "VERB", "PREP", "NOUN"]
+  ]
+}
 }

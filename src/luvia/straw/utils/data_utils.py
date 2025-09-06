@@ -13,21 +13,20 @@ import albumentations as A
 
 class Shorthand_Data(Dataset):
 
-    def __init__(self, files, fixed_size=(48, 56), transforms=None):
+    def __init__(self, files, fixed_size=(48, 56), transforms=False):
 
         self.files = files
         self.fixed_size = fixed_size
-        if transforms is not None:
+        if transforms:
             self.transforms = Shorthand_Dataset.augmentation_functions()
         else:
-            self.transforms = transforms
+            self.transforms = None
 
 
     def std_image(self, img_path):
         fheight, fwidth = self.fixed_size[0], self.fixed_size[1]
  #       img = Shorthand_Dataset.load_image(img_path)
         img = Shorthand_Dataset.preprocess(img_path, (fheight, fwidth))
-        img = torch.Tensor(img).float().unsqueeze(0)
         return img
 
     def __getitem__(self, index):
@@ -40,6 +39,7 @@ class Shorthand_Data(Dataset):
         img = self.std_image(img)
         if self.transforms is not None:
             img = self.transforms(image=img)['image']
+        img = torch.Tensor(img).float().unsqueeze(0)
         return img, img_path
 
     def __len__(self):
@@ -140,11 +140,6 @@ class Shorthand_Dataset(Dataset):
     def get_image(self, img_path):
         fheight, fwidth = self.fixed_size[0], self.fixed_size[1]
         img = Shorthand_Dataset.load_image(img_path)
-
-#        if self.subset == 'train':
- #           nwidth = int(np.random.uniform(.75, 1.25) * img.shape[1])
-  #          nheight = int((np.random.uniform(.9, 1.1) * img.shape[0] / img.shape[1]) * nwidth)
-   #         img = resize(image=img, output_shape=(nheight, nwidth)).astype(np.float32)
         img = Shorthand_Dataset.preprocess(img, (fheight, fwidth))
 
         if self.transforms is not None:

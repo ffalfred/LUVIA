@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: luvia
+Version: 0.1.0
+Summary: LUVIA: Linguistic Understanding via Image Analysis
+Author: Alfred Ferrer Florensa
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+
+# LUVIA
+LUVIA is a stage. LUVIA has human parts. LUVIA finds.

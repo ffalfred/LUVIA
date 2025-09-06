@@ -29,6 +29,7 @@ class LUVIAargs():
         general = parser.add_argument_group("General Settings")
         general.add_argument("-i", "--input", help="Input file")
         general.add_argument("-o", "--output", help="Output folder")
+        general.add_argument("--invert_image", help="Output folder")
         general.add_argument("--clean_mode", choices=["OTSA", "simple", False], default="OTSA")
         general.add_argument("--rotate_img", default=-90, type=float)
         general.add_argument("-v", "--verbose", action="store_true", help="Enable verbose mode")
@@ -104,6 +105,11 @@ class LUVIAargs():
         straw.add_argument("--notransform_input", action='store_false', default=True)
 
     @staticmethod
+    def horde_args(parser):
+        horde = parser.add_argument_group("Horde Settings")
+        horde.add_argument("--folder_streets")
+
+    @staticmethod
     def extract_group_args(args, group_name):
         """Extract arguments from a specific group name."""
         keys = LUVIAargs.ARG_GROUPS.get(group_name, [])
@@ -144,7 +150,6 @@ class LUVIAargs():
         LUVIAargs.tongue_args(main_parser)
         ## Clean
         clean_parser = subparsers.add_parser("clean", help="Run the clean function")
-
         LUVIAargs.default_args(clean_parser)
         LUVIAargs.clean_args(clean_parser)
         ## Tongue
@@ -161,9 +166,14 @@ class LUVIAargs():
         LUVIAargs.default_args(straw_parser)
         LUVIAargs.straw_args(straw_parser)
         ## Spiral
-        spial_parser = subparsers.add_parser("spiral", help="Run the spiral function")
-        LUVIAargs.default_args(spial_parser)
-
+        horde_parser = subparsers.add_parser("horde", help="Run the horde function")
+        LUVIAargs.default_args(horde_parser)
+        LUVIAargs.horde_args(horde_parser)
+        LUVIAargs.clean_args(horde_parser)
+        LUVIAargs.hoofv_args(horde_parser)
+        LUVIAargs.hoofh_args(horde_parser)
+        LUVIAargs.straw_args(horde_parser)
+        LUVIAargs.tongue_args(horde_parser)
 
         arguments_parse = parser.parse_args()
         arguments_parse = LUVIAargs.fix_args(arguments_parse)

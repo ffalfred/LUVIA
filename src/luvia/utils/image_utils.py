@@ -29,6 +29,11 @@ class ImageUtils:
         rotated = cv2.warpAffine(image, M, (new_w, new_h))
         return rotated
 
+    @staticmethod
+    def invert_image(image):
+        inverted = cv2.bitwise_not(image)
+        return inverted
+
 
     @staticmethod
     def rotate_image_crop(image, angle):

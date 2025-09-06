@@ -89,7 +89,7 @@ class ShorthandSegmenter:
         Returns a list of tuples: (cropped_image, angle)
         """
         if original is None:
-            raise ValueError(f"Image at path '{image_path}' could not be loaded.")
+            raise ValueError(f"Image at path '{original}' could not be loaded.")
 
         img_height, img_width = original.shape
         _, binary = cv2.threshold(original, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)

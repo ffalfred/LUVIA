@@ -72,10 +72,11 @@ class DictMatch:
         # Filter dictionary by POS
         #candidates = [word for word, pos in tagged_dict.items() if pos == predicted_pos]
         if predicted_pos is not None:
-            dictcandidates = self.valid_words.loc[self.valid_words[DictMatch.spacy_to_general[predicted_pos]]==1, "word"].tolist()
+            try:
+                dictcandidates = self.valid_words.loc[self.valid_words[DictMatch.spacy_to_general[predicted_pos]]==1, "word"].tolist()
+            except KeyError:
+                dictcandidates = self.valid_words["word"].tolist()            
         else:
-            print("NOOO")
-            exit()
             dictcandidates = self.valid_words["word"].tolist()
         # Use difflib to find closest match
         matches = difflib.get_close_matches(predicted_word, dictcandidates, n=n, cutoff=cutoff)

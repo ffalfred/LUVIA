@@ -12,12 +12,17 @@ import json
 import random
 import numpy as np
 
+
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
 #from gramformer import Gramformer
 from luvia.tongue.distance import DictMatch
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 from deepmultilingualpunctuation import PunctuationModel
+from deep_translator import GoogleTranslator
 
 
 class Tongue:
@@ -39,7 +44,7 @@ class Tongue:
         else:
             self.dictmatch_module = None
         self.match_mode = match_mode
-        self.max_length_structure = 7
+        self.max_length_structure = 12
 
     @staticmethod
     def load_valid_words(db_words):
@@ -287,6 +292,42 @@ class Tongue:
             corrected_batch.append(sentence)
         corrected_batch = list(set(corrected_batch))
         return corrected_batch
+    
+    @staticmethod
+    def analyze_sentence(sentence):
+        # Translate the sentence into German, English, Danish, and Norwegian
+        languages = ['german', 'english', 'danish', 'norwegian']
+        translations = {lang: GoogleTranslator(source='auto', target=lang).translate(sentence) for lang in languages}
+
+        # Get definitions, synonyms, and antonyms for each word
+        words = sentence.split()
+        word_info = {}
+
+        for word in words:
+            synsets = wn.synsets(word)
+            if synsets:
+                definition = synsets[0].definition()
+                synonyms = set()
+                antonyms = set()
+                for syn in synsets:
+                    for lemma in syn.lemmas():
+                        synonyms.add(lemma.name())
+                        if lemma.antonyms():
+                            antonyms.update([ant.name() for ant in lemma.antonyms()])
+                word_info[word] = {
+                    'definition': definition,
+                    'synonyms': list(synonyms),
+                    'antonyms': list(antonyms)
+                }
+            else:
+                word_info[word] = {
+                    'definition': "No definition found",
+                    'synonyms': [],
+                    'antonyms': []
+                }
+        return {"translations": translations, "word_analysis": word_info}
+        
+        
 
     def get_sentence(self, sentences, mode="best", k=1, quantile="5th"):
         if mode == "random":

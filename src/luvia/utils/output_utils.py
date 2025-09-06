@@ -2,32 +2,39 @@ import cv2
 from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import uuid
- 
+import os
+import string
+import numpy as np
 
-from fpdf import FPDF
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Frame, Paragraph, PageTemplate, BaseDocTemplate, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, ListFlowable, ListItem
+from reportlab.platypus import Image, PageBreak, Table, TableStyle, Paragraph
+import os
 
-class LUVIAReport(FPDF):
-
-    def header(self):
-        self.set_font("Arial", 'B', 12)
-        self.cell(0, 10, "LUVIA SYSTEM REPORT", ln=True, align="C")
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font("Arial", 'I', 8)
-        self.cell(0, 10, f"Page {self.page_no()}", align="C")
-
-
+from luvia.utils.pdf_utils import FormalReport
 
 
 class OutUtils:
 
-    def __init__(self, base_folder):
+    def __init__(self, base_folder, mode):
+        self.base_folder = base_folder
 
-        self.output_folder, self.name = self.create_outfolder(base_folder)
-        (self.img_path, self.lineimg_path,
-            self.character_img_path, self.cnnimg_path) = self.make_subfolders()
+        self.output_folder, self.name = self.create_outfolder(base_folder, mode)
+        if mode == "main":
+            (self.img_path, self.lineimg_path,
+                self.character_img_path, self.cnnimg_path) = self.make_subfolders()
+        else:
+            img_path = Path(self.output_folder) / "images"
+            # Create the directory
+            img_path.mkdir(parents=True, exist_ok=True)
+        self.image_paths = {}
 
     def make_subfolders(self):
         img_path = Path(self.output_folder) / "images"
@@ -44,17 +51,22 @@ class OutUtils:
         cnnimg_path.mkdir(parents=True, exist_ok=True)
         return img_path, lineimg_path, charimg_path, cnnimg_path
 
-    def create_outfolder(self, base_folder):
-        # Get current date and time
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        # Generate a 12-character unique ID using UUID
-        unique_id = uuid.uuid4()
-        name_folder = "LUVIA-RUN_{}_{}".format(timestamp,unique_id)
-        # Build the path
-        folder_path = Path(base_folder) / name_folder
-        # Create the directory
-        folder_path.mkdir(parents=True, exist_ok=True)
-        # Return the absolute path
+    def create_outfolder(self, base_folder, mode):
+        if mode != "horde":
+            # Get current date and time
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # Generate a 12-character unique ID using UUID
+            unique_id = uuid.uuid4()
+            name_folder = "LUVIA-RUN-{}_{}_{}".format(mode, timestamp,unique_id)
+            # Build the path
+            folder_path = Path(base_folder) / name_folder
+            # Create the directory
+            folder_path.mkdir(parents=True, exist_ok=True)
+            # Return the absolute path
+        else:
+            name_folder = os.path.basename(base_folder)
+            folder_path = Path(base_folder)
+            folder_path.mkdir(parents=True, exist_ok=True)
         return folder_path.resolve(), name_folder
 
     def save_projection_image(self, image_segments, projection, minima,
@@ -81,7 +93,7 @@ class OutUtils:
         plt.savefig("{}/{}.jpg".format(self.lineimg_path, prefix))
         plt.close()
 
-    def save_image(self, image, prefix, folder="base", angle=0, scale=True,
+    def save_image(self, image, prefix, suffix, folder="base", angle=0, scale=True,
                     inverse=True):
         if folder == "base":
             folder_save = self.img_path
@@ -89,108 +101,282 @@ class OutUtils:
             folder_save = self.lineimg_path
         elif folder == "character":
             folder_save = self.character_img_path
-        # Save vanilla
-        cv2.imwrite("{}/{}.jpg".format(folder_save, prefix), image)
+        if inverse:
+            # Save inverted
+            image = cv2.bitwise_not(image)
+        img_path = "{}/{}_{}.jpg".format(folder_save, prefix, suffix)
+        self.image_paths[suffix] = img_path
         if scale:
             # Save vanilla + matrix
             plt.figure()
             plt.imshow(image, cmap="gray")
-            plt.title("{}_{}".format(self.name, prefix))
+            plt.title("{}_{}_{}".format(prefix, self.name, suffix))
             plt.xlabel("X-axis (pixels)")
             plt.ylabel("Y-axis (pixels)")
             plt.grid(True)
-            plt.savefig("{}/{}_scale.jpg".format(folder_save, prefix))
+            plt.savefig(img_path)
             plt.close()
-        if inverse:
-            # Save inverted
-            inverted_image = cv2.bitwise_not(image)
-            cv2.imwrite("{}/{}_i.jpg".format(folder_save, prefix), inverted_image)
-        if scale and inverse:
-            # Save inverted + matrix
-            plt.figure()
-            plt.imshow(inverted_image, cmap="gray")
-            plt.title("{}_{}_invert".format(self.name, prefix))
-            plt.xlabel("X-axis (pixels)")
-            plt.ylabel("Y-axis (pixels)")
-            plt.grid(True)
-            plt.savefig("{}/{}_i_scale.jpg".format(folder_save, prefix))
-            plt.close()
+        else:
+            # Save vanilla
+            cv2.imwrite(img_path, image)
+        
     
-    def plot_feature_maps(self, activation, prefix, num_maps=8):
-        activation = activation.squeeze(0)
-        fig, axes = plt.subplots(1, num_maps, figsize=(15, 5))
+    def plot_feature_maps(self, activation, prefix, suffix, num_maps=9):
+
+        activation = activation.squeeze(0)  # Shape: (8, H, W)
+        fig, axes = plt.subplots(3, 3, figsize=(10, 12), facecolor='black')  # 4 rows, 2 columns
+        # Ensure axes is a flat list for consistent indexing
+        axes = axes.flatten()
         for i in range(num_maps):
-            axes[i].imshow(activation[i], cmap='viridis')
-            axes[i].axis('off')
-            axes[i].set_title("{}_{}".format(self.name, prefix))
+            ax = axes[i]
+            ax.tick_params(colors='white')
+            ax.imshow(activation[i], cmap='viridis')
+            ax.axis('off')
+            axes[i].set_facecolor('black')
+            ax.set_title(f"{self.name}_{prefix}", color='white')
         plt.tight_layout()
-        plt.savefig("{}/{}.jpg".format(self.cnnimg_path, prefix))
+        path = f"{self.cnnimg_path}/{prefix}_{suffix}.jpg"
+        self.image_paths[suffix+"_dict"][prefix] = path
+        plt.subplots_adjust(hspace=0.0, wspace=0.05)
+        plt.savefig(path)
         plt.close()
 
+
     # Maximally Activated Patches
-    def maximally_activated_patches(self, activation, prefix, num_patches=8):
+    def maximally_activated_patches(self, activation, prefix, suffix, num_patches=9):
         activation = activation.squeeze(0)
-        fig, axes = plt.subplots(1, num_patches, figsize=(15, 5))
+        fig, axes = plt.subplots(3, 3, figsize=(10, 12), facecolor='black')  # 4 rows, 2 columns
+        axes = axes.flatten()
         for i in range(num_patches):
             fmap = activation[i]
+            axes[i].set_facecolor('black')
+            axes[i].tick_params(colors='white')
             axes[i].imshow(fmap, cmap='magma')
             axes[i].axis('off')
-            axes[i].set_title("{}_{}".format(self.name, prefix))
+            axes[i].set_title("{}_{}".format(self.name, prefix), color='white')
         plt.tight_layout()
-        plt.savefig("{}/{}.jpg".format(self.cnnimg_path, prefix))
+        plt.subplots_adjust(hspace=0.0, wspace=0.05)
+        path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
+        self.image_paths[suffix+"_dict"][prefix] = path
+        plt.savefig(path)
         plt.close()
 
     # Filter Visualization
-    def plot_filters(self, layer_weights, prefix, num_filters=8):
+    def plot_filters(self, layer_weights, prefix, suffix, num_filters=9):
         weights = layer_weights.detach().cpu()
-        fig, axes = plt.subplots(1, num_filters, figsize=(15, 5))
+        fig, axes = plt.subplots(3, 3, figsize=(10, 12), facecolor='black')  # 4 rows, 2 columns
+        axes = axes.flatten()
         for i in range(num_filters):
+            axes[i].set_facecolor('black')
             axes[i].imshow(weights[i][0], cmap='gray')
             axes[i].axis('off')
-            axes[i].set_title("{}_{}".format(self.name, prefix))
+            axes[i].tick_params(colors='white')
+            axes[i].set_title("{}_{}".format(self.name, prefix), color='white')
         plt.tight_layout()
-        plt.savefig("{}/{}.jpg".format(self.cnnimg_path, prefix))
+        plt.subplots_adjust(hspace=0.0, wspace=0.05)
+        path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
+        self.image_paths[suffix+"_dict"][prefix] = path
+        plt.savefig(path)
         plt.close()
 
-    def plot_saliency(self, saliency, prefix):
-        plt.figure(figsize=(6, 6))
+    def plot_saliency(self, saliency, prefix, suffix):
+        plt.figure(figsize=(6, 6), facecolor='black')
         plt.imshow(saliency, cmap='hot')
-        plt.axis('off')
-        plt.title("{}_{}".format(self.name, prefix))
-        plt.savefig("{}/{}.jpg".format(self.cnnimg_path, prefix))
+
+        plt.axis('on')
+        plt.xticks(color='white')
+        plt.yticks(color='white')
+        plt.title("{}_{}".format(self.name, prefix), color='white')
+        path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
+        self.image_paths[suffix+"_dict"][prefix] = path
+        plt.savefig(path)
         plt.close()
 
-    def plot_sensitivity(self, sensitivity, prefix):
-        plt.figure(figsize=(6, 6))
+    def plot_sensitivity(self, sensitivity, prefix, suffix):
+        plt.figure(figsize=(6, 6), facecolor='black')
         plt.imshow(sensitivity, cmap='coolwarm')
-        plt.axis('off')
-        plt.title("{}_{}".format(self.name, prefix))
-        plt.savefig("{}/{}.jpg".format(self.cnnimg_path, prefix))
+        plt.axis('on')
+        plt.xticks(color='white')
+        plt.yticks(color='white')
+        plt.title("{}_{}".format(self.name, prefix), color='white')
+        path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
+        self.image_paths[suffix+"_dict"][prefix] = path
+        plt.savefig(path)
         plt.close()
 
-    def plot_guidedbackprop(self, gb_grad, prefix):
+    def plot_guidedbackprop(self, gb_grad, prefix, suffix):
     
-        plt.figure(figsize=(6, 6))
+        plt.figure(figsize=(6, 6), facecolor='black')
         plt.imshow(gb_grad, cmap='inferno')
-        plt.axis('off')
-        plt.title("{}_{}".format(self.name, prefix))
-        plt.savefig("{}/{}.jpg".format(self.cnnimg_path, prefix))
+        plt.axis('on')
+        plt.xticks(color='white')
+        plt.yticks(color='white')
+        plt.title("{}_{}".format(self.name, prefix), color='white')
+        path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
+        self.image_paths[suffix+"_dict"][prefix] = path
+        plt.savefig(path)
         plt.close()
 
+    def plot_alltransformations(self):
+        fig, axes = plt.subplots(2, 2, figsize=(10, 12), facecolor='black')
+        img = mpimg.imread(self.image_paths["original"])
+        axes[0,0].imshow(img)
+        axes[0,0].axis('off')        
+        img = mpimg.imread(self.image_paths["cleaned"])
+        axes[0,1].imshow(img)
+        axes[0,1].axis('off')   
+        img = mpimg.imread(self.image_paths["rotated"])
+        axes[1,0].imshow(img)
+        axes[1,0].axis('off')   
+        img = mpimg.imread(self.image_paths["contours"])
+        axes[1,1].imshow(img)
+        axes[1,1].axis('off')   
+        plt.subplots_adjust(hspace=0.05, wspace=0.05)
+        plt.tight_layout()
+        path = "{}/images/image-transformation.jpg".format(self.base_folder)
+        plt.savefig(path)
+        plt.close()   
+        
+    def plot_allsentence_images(self, line_num, amount_charact):
+        fig, axes = plt.subplots(nrows=9, ncols=amount_charact, facecolor="black",
+                                        figsize=(amount_charact * 2, 18),
+                                        squeeze=False)
+        #axes = np.atleast_2d(axes)
+        print("HELLO", axes.shape, amount_charact)
 
-    def create_pdfresults(self, list_sentences):
-        pdf = LUVIAReport()
-        pdf.add_page()
-        pdf.set_font("Courier", size=10)
-        pdf.set_text_color(22, 47, 72)  # Deep Blue
+        for s in range(amount_charact):
+            name_key = "line-{}_character-{}_dict".format(line_num, s)
+            images = self.image_paths[name_key]
+            img = mpimg.imread(self.image_paths["image_line-{}_character-{}".format(line_num, s)])
+            axes[0,s].imshow(img)
+            axes[0,s].axis('off')
+            img = mpimg.imread(images["cnn_featmap2"])
+            axes[4,s].imshow(img)
+            axes[4,s].axis('off')
+            img = mpimg.imread(images["cnn_featmap1"])
+            axes[5,s].imshow(img)
+            axes[5,s].axis('off')
+            img = mpimg.imread(images["cnn_actMAX1"])
+            axes[6,s].imshow(img)
+            axes[6,s].axis('off')
+            img = mpimg.imread(images["cnn_saliency"])
+            axes[1,s].imshow(img)
+            axes[1,s].axis('off')
+            img = mpimg.imread(images["cnn_guidedbackprop"])
+            axes[2,s].imshow(img)
+            axes[2,s].axis('off')
+            img = mpimg.imread(images["cnn_sensitivity"])
+            axes[3,s].imshow(img)
+            axes[3,s].axis('off')
+            img = mpimg.imread(images["cnn_act1"])
+            axes[7,s].imshow(img)
+            axes[7,s].axis('off')
+            img = mpimg.imread(images["cnn_act2"])
+            axes[8,s].imshow(img)
+            axes[8,s].axis('off')        
+        plt.subplots_adjust(hspace=0.05, wspace=0.05)
+        plt.tight_layout()
+        path = "{}/sentence-spectrum.jpg".format(self.cnnimg_path)
+        plt.savefig(path)
+        plt.close()                
 
-        pdf.multi_cell(0, 10, "ABSTRACT:\nThis document outlines the inference results of the LUVIA system applied to your streets.")
 
-        pdf.set_text_color(184, 55, 74)  # Red
-        pdf.cell(0, 10, "RESULTS:", ln=True)
-        # Body text
-        pdf.set_font("Arial", '', 12)
-        for sentence in list_sentences:
-            pdf.multi_cell(0, 10, sentence)
 
-        pdf.output("{}/luvia_report.pdf".format(self.output_folder))
+    def plot_allchar_images(self, suffix):
+        images = self.image_paths[suffix+"_dict"]
+        fig, axes = plt.subplots(3, 3, figsize=(10, 12), facecolor='black')
+        axes = axes.ravel()
+        img = mpimg.imread(self.image_paths["image_"+suffix])
+        axes[0].imshow(img)
+        axes[0].axis('off')
+        img = mpimg.imread(images["cnn_featmap2"])
+        axes[4].imshow(img)
+        axes[4].axis('off')
+        img = mpimg.imread(images["cnn_featmap1"])
+        axes[5].imshow(img)
+        axes[5].axis('off')
+        img = mpimg.imread(images["cnn_actMAX1"])
+        axes[6].imshow(img)
+        axes[6].axis('off')
+        img = mpimg.imread(images["cnn_saliency"])
+        axes[1].imshow(img)
+        axes[1].axis('off')
+        img = mpimg.imread(images["cnn_guidedbackprop"])
+        axes[2].imshow(img)
+        axes[2].axis('off')
+        img = mpimg.imread(images["cnn_sensitivity"])
+        axes[3].imshow(img)
+        axes[3].axis('off')
+        img = mpimg.imread(images["cnn_act1"])
+        axes[7].imshow(img)
+        axes[7].axis('off')
+        img = mpimg.imread(images["cnn_act2"])
+        axes[8].imshow(img)
+        axes[8].axis('off')
+        for ax in axes:
+            for spine in ax.spines.values():
+                spine.set_edgecolor('white')
+                spine.set_linewidth(2)
+
+        plt.subplots_adjust(hspace=0.05, wspace=0.05)
+        plt.tight_layout()
+        path = "{}/character-spectrum_{}.jpg".format(self.cnnimg_path, suffix)
+        plt.savefig(path)
+        plt.close()
+
+    def create_pdfimage(self):
+        report = FormalReport("{}/LUVIA_reportimage.pdf".format(self.output_folder))
+        report.add_cover_page(project_name="LUVIA Analysis - Image Scrapping", author="Alfred Ferrer Florensa", date="27/08/2025")
+        # Section with image
+        report.add_section_with_image(title="Original traces found on the asphalt",
+                                    text="This is the uploaded image of the traces found on the asphalt",
+                                    image_path=self.image_paths["original"])
+        # Section with image
+        report.add_section_with_image(title="Smedt shorthand detected on the asphalt",
+                                    text="LUVIA found traces on the street with high chances of being Smedt shorthand",
+                                    image_path=self.image_paths["cleaned"])
+        # Section with image
+        report.add_section_with_image(title="Oriented traces of the Smedt shorthand",
+                                    text="LUVIA has oriented the street into the direction of the traces of the Smedt shorthand",
+                                    image_path=self.image_paths["rotated"])
+        # Section with image
+        report.add_section_with_image(title="Found Smedt shorthand sentences",
+                                    text="LUVIA has detected sentences of Smedt shorthand on the street",
+                                    image_path=self.image_paths["contours"])
+        report.build()
+
+
+    def create_pdftranslation(self, sentences_data):
+
+        report = FormalReport("{}/LUVIA_reporttranslation.pdf".format(self.output_folder))
+        report.add_cover_page(project_name="LUVIA Analysis - Translation", author="Alfred Ferrer Florensa", date="27/08/2025")
+
+        # Section with image
+        report.add_section_with_image(title="Sentences found by LUVIA written in Smedt shorthand",
+                                    text="Luvia detected {} possible sentences hidden in the asphalt".format(len(sentences_data)),
+                                    image_path=self.image_paths["contours"])
+        report.story.append(PageBreak())
+        report.add_section(title="Individual analysis of sentences detected", content="Below you can find a extensive analysis of the written words found by LUVIA")
+        for idx, entry in enumerate(sentences_data):
+            report.add_subsection_with_image(title="Sentence number {}".format(idx), location="52,60"
+                                             ,proposed_sentences=entry, image_path=self.image_paths["image_line-{}".format(idx)])
+            report.story.append(PageBreak())
+
+        report.build()
+
+if __name__== "__main__":
+
+    from reportlab.lib.units import inch
+
+    report = FormalReport("my_report_with_image.pdf")
+    report.add_cover_page(project_name="LUVIA Analysis", author="Alfred Ferrer Florensa", date="27/08/2025")
+
+    # Section with image
+
+    report.add_section_with_image("Sentences found by LUVIA written in Smedt shorthand", "Luvia detected 5 possible sentences hidden in the asphalt",
+                                  "test/LUVIA-RUN_2025-08-26_00-09-37_03c19400-9a8e-4ca2-9c63-07d42d588f5f/images/contours_i_scale.jpg")
+    report.add_section("Individual analysis of sentences detected", "Below you can find a extensive analysis of the written words found by LUVIA")
+    report.build()
+
+
+

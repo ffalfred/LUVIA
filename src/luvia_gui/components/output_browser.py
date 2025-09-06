@@ -11,11 +11,16 @@ class OutputBrowser(QWidget):
         self.setLayout(layout)
         self.refresh_output()
 
+
     def refresh_output(self):
-        output_dir = os.path.expanduser("~/output")  # Change to your actual output path
+        output_dir = getattr(self, "output_dir", os.path.expanduser("~/output"))
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-
         self.list_widget.clear()
         for filename in os.listdir(output_dir):
             self.list_widget.addItem(filename)
+
+
+    def set_output_directory(self, path: str):
+        self.output_dir = path
+        self.refresh_output()
