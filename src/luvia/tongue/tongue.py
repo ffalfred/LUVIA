@@ -11,7 +11,9 @@ import torch
 import json
 import random
 import numpy as np
-
+import ety
+import string
+import math
 
 nltk.download('wordnet')
 nltk.download('omw-1.4')
@@ -292,18 +294,36 @@ class Tongue:
             corrected_batch.append(sentence)
         corrected_batch = list(set(corrected_batch))
         return corrected_batch
-    
-    @staticmethod
-    def analyze_sentence(sentence):
-        # Translate the sentence into German, English, Danish, and Norwegian
-        languages = ['german', 'english', 'danish', 'norwegian']
-        translations = {lang: GoogleTranslator(source='auto', target=lang).translate(sentence) for lang in languages}
 
-        # Get definitions, synonyms, and antonyms for each word
+    @staticmethod
+    def perplexity_to_score_log(perplexity):
+        score = 100 * (1 - math.log(perplexity + 1) / math.log(10000 + 1))
+        return round(max(0, min(score, 100)), 2)
+
+
+    def charcterize_sentence(self, sentence):
+        # Translations
+        languages = ['german', 'english', 'danish', 'norwegian']
+        translations = {
+            lang: GoogleTranslator(source='auto', target=lang).translate(sentence)
+            for lang in languages
+        }
+
+        ## Syntactic analysis
+        #doc = self.nlp(sentence)
+        #syntax = [{
+        #    "text": token.text,
+        #    "pos": token.pos_,
+        #    "dep": token.dep_,
+        #    "head": token.head.text
+        #} for token in doc]
+
+        # Word-level analysis
         words = sentence.split()
         word_info = {}
-
         for word in words:
+            word = word.translate(str.maketrans('', '', string.punctuation))
+            word = word.lower()
             synsets = wn.synsets(word)
             if synsets:
                 definition = synsets[0].definition()
@@ -314,20 +334,26 @@ class Tongue:
                         synonyms.add(lemma.name())
                         if lemma.antonyms():
                             antonyms.update([ant.name() for ant in lemma.antonyms()])
+                etymology = [str(origin) for origin in ety.origins(word, recursive=True)]
                 word_info[word] = {
                     'definition': definition,
                     'synonyms': list(synonyms),
-                    'antonyms': list(antonyms)
+                    'antonyms': list(antonyms),
+                    'etymology': etymology
                 }
             else:
                 word_info[word] = {
                     'definition': "No definition found",
                     'synonyms': [],
-                    'antonyms': []
+                    'antonyms': [],
+                    'etymology': []
                 }
-        return {"translations": translations, "word_analysis": word_info}
-        
-        
+
+        return {
+            "translations": translations,
+            #"syntax": syntax,
+            "word_analysis": word_info
+        }
 
     def get_sentence(self, sentences, mode="best", k=1, quantile="5th"):
         if mode == "random":
@@ -352,9 +378,11 @@ class Tongue:
             quantile_sel = quantiles[quantile]
             quantile_sentences = []
             for entry in sentences:
+                entry["sentence"] = entry["sentence"].replace('"', '')
                 if entry["perplexity"] >= quantile_sel[0] and entry["perplexity"] <= quantile_sel[1]:
                     quantile_sentences.append(entry)
             sentences_meta = random.sample(sentences, k)
+            sentences_meta.sort(key=lambda x: x["perplexity"])
         return sentences_meta
 
     

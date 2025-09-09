@@ -1,9 +1,10 @@
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+import os
+import signal
 import subprocess
 import logging
 from datetime import datetime
-
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 class CommandWorker(QObject):
     output_line = pyqtSignal(str)
@@ -19,32 +20,44 @@ class CommandWorker(QObject):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         logging.info(f"{timestamp} - Executing: {self.command}")
 
-        self.process = subprocess.Popen(
-            self.command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
+        try:
+            self.process = subprocess.Popen(
+                self.command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                preexec_fn=os.setsid  # Start in a new process group
+            )
 
-        for line in self.process.stdout:
-            if self._should_stop:
-                break
-            line = line.strip()
-            if line:
-                logging.info(line)
-                self.output_line.emit(line)
+            for line in self.process.stdout:
+                if self._should_stop:
+                    break
+                line = line.strip()
+                if line:
+                    logging.info(line)
+                    self.output_line.emit(line)
 
-        self.process.wait()
-        self.finished.emit()
+            self.process.wait()
+        except Exception as e:
+            self.output_line.emit(f"Error executing command: {e}")
+        finally:
+            self.finished.emit()
 
     def stop(self):
         self._should_stop = True
         if self.process and self.process.poll() is None:
-            self.process.terminate()
-            self.output_line.emit("Process terminated.")
-
+            try:
+                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                self.output_line.emit("Process terminated.")
+            except Exception as e:
+                self.output_line.emit(f"Failed to terminate process: {e}")
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                    self.output_line.emit("Process forcefully killed.")
+                except Exception as e2:
+                    self.output_line.emit(f"Failed to kill process: {e2}")
 
 class CommandManager:
     def __init__(self, terminal=None, log_file="command_log.txt", button=None, spinner=None, stop_button=None):
@@ -53,6 +66,7 @@ class CommandManager:
         self.button = button
         self.spinner = spinner
         self.stop_button = stop_button
+        self.command_finished_callback = None
 
         logging.basicConfig(
             filename=self.log_file,
@@ -65,10 +79,8 @@ class CommandManager:
             self.button.setEnabled(False)
         if self.spinner:
             self.spinner.setVisible(True)
-
-        if hasattr(self, 'stop_button'):
+        if self.stop_button:
             self.stop_button.setEnabled(True)
-
 
         self.thread = QThread()
         self.worker = CommandWorker(command)
@@ -92,12 +104,12 @@ class CommandManager:
             self.button.setEnabled(True)
         if self.spinner:
             self.spinner.setVisible(False)
-
-        if hasattr(self, 'stop_button'):
+        if self.stop_button:
             self.stop_button.setEnabled(False)
+        if self.command_finished_callback:
+            self.command_finished_callback()
 
 
     def stop_command(self):
         if hasattr(self, 'worker') and self.worker:
             self.worker.stop()
-

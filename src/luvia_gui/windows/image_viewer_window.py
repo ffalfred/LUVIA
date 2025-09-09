@@ -30,11 +30,6 @@ class ImageViewerWindow(QMainWindow):
         self.main_layout = QVBoxLayout()
         self.central_widget.setLayout(self.main_layout)
 
-        # Image label
-        self.image_label = QLabel("No image loaded")
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.main_layout.addWidget(self.image_label)
-
         # Zoom buttons
         button_layout = QHBoxLayout()
         self.zoom_in_button = QPushButton("Zoom In")
@@ -60,7 +55,7 @@ class ImageViewerWindow(QMainWindow):
         self.dragging = False
         self.drag_start_position = QPoint()
 
-        self.image_label.setScaledContents(True)
+        self.image_label.setScaledContents(False)
         self.image_label.setMouseTracking(True)
 
         self.refresh_timer = QTimer(self)
@@ -94,9 +89,10 @@ class ImageViewerWindow(QMainWindow):
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
+            self.image_label.setText("")
             self.image_label.setPixmap(scaled_pixmap)
         else:
-            self.image_label.setText("Failed to load image.")
+            self.image_label.setText("Failed to load image. {}".format(self.current_image_path))
 
     def zoom_in(self):
         self.zoom_factor *= 1.2
@@ -135,3 +131,62 @@ class ImageViewerWindow(QMainWindow):
             self.dragging = True
             self.drag_start_position = event.pos()
 
+
+class ImageView(QWidget):
+    def __init__(self, image_path: str):
+        super().__init__()
+        self.image_path = image_path
+        self.last_modified = None
+        self.image_label = QLabel()
+        self.init_ui()
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.check_for_update)
+        self.timer.start(2000)  # Check every 2 seconds
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        self.title = QLabel("Image Viewer")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title.setStyleSheet("font-family: Times-Roman; font-size: 18pt; color: black;")
+        layout.addWidget(self.title)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("background-color: white;")
+        layout.addWidget(self.scroll_area)
+
+        self.scroll_content = QWidget()
+        self.scroll_layout = QVBoxLayout()
+        self.scroll_content.setLayout(self.scroll_layout)
+        self.scroll_area.setWidget(self.scroll_content)
+
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.scroll_layout.addWidget(self.image_label)
+
+        self.load_image()
+
+    def load_image(self):
+        if not os.path.exists(self.image_path):
+            self.image_label.setText(f"Image not found: {self.image_path}")
+            return
+
+        pixmap = QPixmap(self.image_path)
+        if pixmap.isNull():
+            self.image_label.setText("Failed to load image.")
+        else:
+            self.image_label.setPixmap(pixmap.scaledToWidth(800, Qt.TransformationMode.SmoothTransformation))
+            self.last_modified = os.path.getmtime(self.image_path)
+
+    def check_for_update(self):
+        if not os.path.exists(self.image_path):
+            return
+
+        current_modified = os.path.getmtime(self.image_path)
+        if self.last_modified is None or current_modified > self.last_modified:
+            self.load_image()
+
+    def stop_auto_refresh(self):
+        self.timer.stop()

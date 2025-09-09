@@ -36,7 +36,35 @@ class PDFViewerWindow(QMainWindow):
 
         self.current_folder = self.app_state.get_output_folder()
         self.current_page = 0
+
+        self.zoom_factor = 1.0
+
+        zoom_layout = QHBoxLayout()
+        self.zoom_in_button = QPushButton("Zoom In")
+        self.zoom_out_button = QPushButton("Zoom Out")
+        self.reset_zoom_button = QPushButton("Reset Zoom")
+
+        zoom_layout.addWidget(self.zoom_in_button)
+        zoom_layout.addWidget(self.zoom_out_button)
+        zoom_layout.addWidget(self.reset_zoom_button)
+
+        self.main_layout.addLayout(zoom_layout)
+        self.zoom_in_button.clicked.connect(self.zoom_in)
+        self.zoom_out_button.clicked.connect(self.zoom_out)
+        self.reset_zoom_button.clicked.connect(self.reset_zoom)
         self.load_latest_pdf()
+
+    def zoom_in(self):
+        self.zoom_factor *= 1.2
+        self.pdf_view.setZoomFactor(self.zoom_factor)
+
+    def zoom_out(self):
+        self.zoom_factor /= 1.2
+        self.pdf_view.setZoomFactor(self.zoom_factor)
+
+    def reset_zoom(self):
+        self.zoom_factor = 1.0
+        self.pdf_view.setZoomFactor(self.zoom_factor)
 
     def on_output_folder_changed(self, folder: str):
         self.current_folder = folder

@@ -4,7 +4,7 @@ class LUVIAargs():
 
     # Dictionary to track which arguments belong to which group
     ARG_GROUPS = {
-                "general": ["input", "output", "verbose", "clean_mode"],
+                "general": ["input", "output", "user", "verbose", "clean_mode"],
                 "clean_simple": ["blur_kernel", "blur_sigma",
                         "block_size", "vthresh_C", "min_area", "max_area",
                         "min_aspect", "max_aspect", "min_vertices"],
@@ -29,7 +29,8 @@ class LUVIAargs():
         general = parser.add_argument_group("General Settings")
         general.add_argument("-i", "--input", help="Input file")
         general.add_argument("-o", "--output", help="Output folder")
-        general.add_argument("--invert_image", help="Output folder")
+        general.add_argument("-u", "--user", default="Anonymous")
+        general.add_argument("--inverted_image", help="Output folder", default=False)
         general.add_argument("--clean_mode", choices=["OTSA", "simple", False], default="OTSA")
         general.add_argument("--rotate_img", default=-90, type=float)
         general.add_argument("-v", "--verbose", action="store_true", help="Enable verbose mode")
@@ -87,7 +88,7 @@ class LUVIAargs():
         tongue.add_argument("--sel_sentence", choices=["random", "best", "quantile"], default="quantile")
         tongue.add_argument("--quantile", choices=["5th", "10th", "25th", "50th", "75th",
                                                    "90th", "95th", "100th"], default="5th")
-        tongue.add_argument("--final_sentences", default=2, type=int)
+        tongue.add_argument("--final_sentences", default=3, type=int)
 
     @staticmethod
     def straw_args(parser):

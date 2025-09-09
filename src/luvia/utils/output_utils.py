@@ -7,6 +7,8 @@ import uuid
 import os
 import string
 import numpy as np
+import matplotlib.gridspec as gridspec
+
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -17,6 +19,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, ListFlowable, ListItem
 from reportlab.platypus import Image, PageBreak, Table, TableStyle, Paragraph
 import os
+from luvia.utils.image_utils import ImageUtils
+
 
 from luvia.utils.pdf_utils import FormalReport
 
@@ -35,6 +39,7 @@ class OutUtils:
             # Create the directory
             img_path.mkdir(parents=True, exist_ok=True)
         self.image_paths = {}
+        self.image_objects = {"general": {}, "lines": {}}
 
     def make_subfolders(self):
         img_path = Path(self.output_folder) / "images"
@@ -70,28 +75,43 @@ class OutUtils:
         return folder_path.resolve(), name_folder
 
     def save_projection_image(self, image_segments, projection, minima,
-                                maxima, prefix, inverse=False):
+                                maxima, prefix, line_count, inverse=False):
         if inverse:
             # Save inverted
             image_segments = cv2.bitwise_not(image_segments)
-        fig, (ax1, ax2) = plt.subplots(2,1)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16,8),
+                                       gridspec_kw={'height_ratios': [1.25, 1]})
+
+        # Top image plot
         ax1.imshow(image_segments, cmap="gray")
         ax1.set_title("Vertical Projection Segmentation")
         ax1.set_xlabel("X-axis (pixels)")
         ax1.set_ylabel("Y-axis (pixels)")
+        ax1.tick_params()
+        ax1.grid(True)
+
+        # Bottom projection plot
         ax2.plot(projection, label="Smoothed Projection", color="blue")
         if len(minima) > 0:
-            ax2.scatter(minima, projection[minima], color="red", label="Local Minima")
+            minima_flatten = [item for tup in minima for item in tup]
+            ax2.scatter(minima_flatten, [int(projection[i]) for i in minima_flatten], color="red", label="Local Minima")
         if len(maxima) > 0:
-            ax2.scatter(maxima, projection[maxima], color="green", label="Local Maxima")
+            #maxima_flatten = [item for tup in maxima for item in tup]
+            ax2.scatter(maxima, [int(projection[i]) for i in maxima], color="green", label="Local Maxima")
         ax2.set_title("Vertical Projection Profile with Local Extrema")
         ax2.set_xlabel("Column Index")
         ax2.set_ylabel("Sum of Pixel Values")
         ax2.legend()
         ax2.grid(True)
+        ax2.tick_params()
+        path = f"{self.lineimg_path}/{prefix}.jpg"
+        self.image_paths["line-{}-projection".format(line_count)] = path
+        # Final layout and save
         plt.tight_layout()
-        plt.savefig("{}/{}.jpg".format(self.lineimg_path, prefix))
+        plt.savefig(path, facecolor=fig.get_facecolor(), dpi=300)
         plt.close()
+
 
     def save_image(self, image, prefix, suffix, folder="base", angle=0, scale=True,
                     inverse=True):
@@ -103,7 +123,7 @@ class OutUtils:
             folder_save = self.character_img_path
         if inverse:
             # Save inverted
-            image = cv2.bitwise_not(image)
+            image = ImageUtils.invert_image(image)
         img_path = "{}/{}_{}.jpg".format(folder_save, prefix, suffix)
         self.image_paths[suffix] = img_path
         if scale:
@@ -114,11 +134,11 @@ class OutUtils:
             plt.xlabel("X-axis (pixels)")
             plt.ylabel("Y-axis (pixels)")
             plt.grid(True)
-            plt.savefig(img_path)
+            plt.savefig(img_path, dpi=300)
             plt.close()
         else:
             # Save vanilla
-            cv2.imwrite(img_path, image)
+            cv2.imwrite(img_path, image, dpi=300)
         
     
     def plot_feature_maps(self, activation, prefix, suffix, num_maps=9):
@@ -158,7 +178,7 @@ class OutUtils:
         plt.subplots_adjust(hspace=0.0, wspace=0.05)
         path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
         self.image_paths[suffix+"_dict"][prefix] = path
-        plt.savefig(path)
+        plt.savefig(path, dpi=300)
         plt.close()
 
     # Filter Visualization
@@ -176,12 +196,12 @@ class OutUtils:
         plt.subplots_adjust(hspace=0.0, wspace=0.05)
         path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
         self.image_paths[suffix+"_dict"][prefix] = path
-        plt.savefig(path)
+        plt.savefig(path, dpi=300)
         plt.close()
 
     def plot_saliency(self, saliency, prefix, suffix):
         plt.figure(figsize=(6, 6), facecolor='black')
-        plt.imshow(saliency, cmap='hot')
+        img = plt.imshow(saliency, cmap='hot')
 
         plt.axis('on')
         plt.xticks(color='white')
@@ -189,7 +209,7 @@ class OutUtils:
         plt.title("{}_{}".format(self.name, prefix), color='white')
         path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
         self.image_paths[suffix+"_dict"][prefix] = path
-        plt.savefig(path)
+        plt.savefig(path, dpi=300)
         plt.close()
 
     def plot_sensitivity(self, sensitivity, prefix, suffix):
@@ -201,7 +221,7 @@ class OutUtils:
         plt.title("{}_{}".format(self.name, prefix), color='white')
         path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
         self.image_paths[suffix+"_dict"][prefix] = path
-        plt.savefig(path)
+        plt.savefig(path, dpi=300)
         plt.close()
 
     def plot_guidedbackprop(self, gb_grad, prefix, suffix):
@@ -214,7 +234,7 @@ class OutUtils:
         plt.title("{}_{}".format(self.name, prefix), color='white')
         path = "{}/{}_{}.jpg".format(self.cnnimg_path, prefix, suffix)
         self.image_paths[suffix+"_dict"][prefix] = path
-        plt.savefig(path)
+        plt.savefig(path, dpi=300)
         plt.close()
 
     def plot_alltransformations(self):
@@ -233,95 +253,78 @@ class OutUtils:
         axes[1,1].axis('off')   
         plt.subplots_adjust(hspace=0.05, wspace=0.05)
         plt.tight_layout()
-        path = "{}/images/image-transformation.jpg".format(self.base_folder)
-        plt.savefig(path)
+        path = "{}/image-transformation.jpg".format(self.output_folder)
+        plt.savefig(path, dpi=300)
         plt.close()   
         
-    def plot_allsentence_images(self, line_num, amount_charact):
-        fig, axes = plt.subplots(nrows=9, ncols=amount_charact, facecolor="black",
-                                        figsize=(amount_charact * 2, 18),
-                                        squeeze=False)
-        #axes = np.atleast_2d(axes)
-        print("HELLO", axes.shape, amount_charact)
-
-        for s in range(amount_charact):
-            name_key = "line-{}_character-{}_dict".format(line_num, s)
-            images = self.image_paths[name_key]
-            img = mpimg.imread(self.image_paths["image_line-{}_character-{}".format(line_num, s)])
-            axes[0,s].imshow(img)
-            axes[0,s].axis('off')
-            img = mpimg.imread(images["cnn_featmap2"])
-            axes[4,s].imshow(img)
-            axes[4,s].axis('off')
-            img = mpimg.imread(images["cnn_featmap1"])
-            axes[5,s].imshow(img)
-            axes[5,s].axis('off')
-            img = mpimg.imread(images["cnn_actMAX1"])
-            axes[6,s].imshow(img)
-            axes[6,s].axis('off')
-            img = mpimg.imread(images["cnn_saliency"])
-            axes[1,s].imshow(img)
-            axes[1,s].axis('off')
-            img = mpimg.imread(images["cnn_guidedbackprop"])
-            axes[2,s].imshow(img)
-            axes[2,s].axis('off')
-            img = mpimg.imread(images["cnn_sensitivity"])
-            axes[3,s].imshow(img)
-            axes[3,s].axis('off')
-            img = mpimg.imread(images["cnn_act1"])
-            axes[7,s].imshow(img)
-            axes[7,s].axis('off')
-            img = mpimg.imread(images["cnn_act2"])
-            axes[8,s].imshow(img)
-            axes[8,s].axis('off')        
-        plt.subplots_adjust(hspace=0.05, wspace=0.05)
-        plt.tight_layout()
-        path = "{}/sentence-spectrum.jpg".format(self.cnnimg_path)
-        plt.savefig(path)
-        plt.close()                
-
-
-
-    def plot_allchar_images(self, suffix):
+         
+    def plot_allchar_images(self, suffix, line_count, word, sentence):
         images = self.image_paths[suffix+"_dict"]
-        fig, axes = plt.subplots(3, 3, figsize=(10, 12), facecolor='black')
-        axes = axes.ravel()
+        fig = plt.figure(figsize=(10, 12), facecolor='black')
+
+        plt.subplots_adjust(left=0.05, right=0.95, top=0.96, bottom=0.05, hspace=0.05, wspace=0.5)
+        #plt.subplots_adjust(left=0.05, right=0.95, top=0.94, bottom=0.05, hspace=0.05, wspace=0.05)
+
+        fig.patch.set_facecolor('black')  # Ensure full black background
+        # Add an extra row for the title (5 rows total)
+        gs = gridspec.GridSpec(4, 3, height_ratios=[2, 2, 0.3, 2], hspace=0.1, wspace=0.05)
+        # Subplots
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax3 = fig.add_subplot(gs[0, 2])
+        ax4 = fig.add_subplot(gs[1, 0])
+        ax5 = fig.add_subplot(gs[1, 1])
+        ax6 = fig.add_subplot(gs[1, 2])
+        title_ax = fig.add_subplot(gs[2, :])  # Title axis
+        ax7 = fig.add_subplot(gs[3, :])
+        axes = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
         img = mpimg.imread(self.image_paths["image_"+suffix])
-        axes[0].imshow(img)
-        axes[0].axis('off')
-        img = mpimg.imread(images["cnn_featmap2"])
-        axes[4].imshow(img)
-        axes[4].axis('off')
-        img = mpimg.imread(images["cnn_featmap1"])
-        axes[5].imshow(img)
-        axes[5].axis('off')
-        img = mpimg.imread(images["cnn_actMAX1"])
-        axes[6].imshow(img)
-        axes[6].axis('off')
+        ax1.imshow(img)
+        ax1.set_facecolor('black')
+        ax1.axis('off')
         img = mpimg.imread(images["cnn_saliency"])
-        axes[1].imshow(img)
-        axes[1].axis('off')
+        ax2.imshow(img)
+        ax2.set_facecolor('black')
+        ax2.axis('off')
         img = mpimg.imread(images["cnn_guidedbackprop"])
-        axes[2].imshow(img)
-        axes[2].axis('off')
-        img = mpimg.imread(images["cnn_sensitivity"])
-        axes[3].imshow(img)
-        axes[3].axis('off')
+        ax3.imshow(img)
+        ax3.set_facecolor('black')
+        ax3.axis('off')
+        img = mpimg.imread(images["cnn_actMAX1"])
+        ax5.imshow(img)
+        ax5.set_facecolor('black')
+        ax5.axis('off')
         img = mpimg.imread(images["cnn_act1"])
-        axes[7].imshow(img)
-        axes[7].axis('off')
-        img = mpimg.imread(images["cnn_act2"])
-        axes[8].imshow(img)
-        axes[8].axis('off')
-        for ax in axes:
+        ax4.imshow(img)
+        ax4.set_facecolor('black')
+        ax4.axis('off')
+        img = mpimg.imread(images["cnn_sensitivity"])
+        ax6.imshow(img)
+        ax6.set_facecolor('black')
+        ax6.axis('off')
+        img = mpimg.imread(self.image_paths["line-{}-projection".format(line_count)])
+        ax7.imshow(img)
+        ax7.set_facecolor('black')
+        ax7.axis('off')        
+        ax1_left = ax1.get_position().x0
+        # Mid-level title axis
+        title_ax.axis('off')
+        title_ax.set_facecolor('black')
+        title_ax.text(0.0, 0.5, r"Most probable sentence: $\bf{{{}}}$".format(sentence), ha='left', va='center',
+                    fontsize=20, color='white', transform=title_ax.transAxes)
+
+        # Top-level title aligned with ax1's left edge
+        fig.text(ax1_left, 0.975, r"Most probable word: $\bf{{{}}}$".format(word), ha='left', va='top',
+                fontsize=20, color='white')
+        for ax in [ax1,ax2,ax3,ax4,ax5,ax6]:
             for spine in ax.spines.values():
                 spine.set_edgecolor('white')
                 spine.set_linewidth(2)
-
+        fig.patch.set_facecolor('black') 
         plt.subplots_adjust(hspace=0.05, wspace=0.05)
         plt.tight_layout()
-        path = "{}/character-spectrum_{}.jpg".format(self.cnnimg_path, suffix)
-        plt.savefig(path)
+        path = "{}/character-spectrum_{}.jpg".format(self.output_folder, suffix)
+        plt.savefig(path, dpi=300, facecolor=fig.get_facecolor())
         plt.close()
 
     def create_pdfimage(self):
@@ -363,6 +366,13 @@ class OutUtils:
             report.story.append(PageBreak())
 
         report.build()
+    
+
+
+
+
+
+
 
 if __name__== "__main__":
 

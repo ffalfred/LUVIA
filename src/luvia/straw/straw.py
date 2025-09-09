@@ -150,9 +150,9 @@ class Straw:
         vocab_inv_dict = {v: k for k, v in Straw.vocab_dict.items()}
         results = {}
 
-        for images, paths in tqdm(data_loader):
+        for images, paths in data_loader:
             images = images.to(self.device)
-            for i in range(len(images)):
+            for i in tqdm(range(len(images))):
                 results[paths[i]] = {}
                 results[paths[i]]["output"] = []
                 output, act1, act2 = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],

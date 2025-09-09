@@ -14,7 +14,12 @@ from reportlab.platypus import Frame, Paragraph, PageTemplate, BaseDocTemplate, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, ListFlowable, ListItem
 from reportlab.platypus import Image, PageBreak, Table, TableStyle, Paragraph
+from reportlab.platypus import KeepTogether
+
 import os
+
+from reportlab.lib.utils import ImageReader
+
 
 
 class FormalReport:
@@ -79,22 +84,41 @@ class FormalReport:
         canvas.restoreState()
 
 
+
     def draw_footer(self, canvas, doc):
         canvas.saveState()
         footer_top = 50 * mm
 
+        # Draw golden and red lines
         canvas.setLineWidth(4)
         canvas.setStrokeColor(colors.HexColor("#DCB68A"))  # Golden
         canvas.line(self.MARGIN, footer_top, self.PAGE_WIDTH - self.MARGIN, footer_top)
         canvas.setStrokeColor(colors.HexColor("#B8374A"))  # Red
         canvas.line(self.MARGIN, footer_top - 2 * mm, self.PAGE_WIDTH - self.MARGIN, footer_top - 2 * mm)
 
-        canvas.drawImage(self.footer_logo_path, x=self.MARGIN, y=self.MARGIN, width=25 * mm, height=25 * mm, mask='auto')
+        # Draw logo on the right side without stretching
+        logo_width = 45 * mm
+        logo_height = 45 * mm
+        logo_x = self.PAGE_WIDTH - self.MARGIN - logo_width
+        logo_y = self.MARGIN
+        canvas.drawImage(
+            self.footer_logo_path,
+            x=logo_x,
+            y=logo_y,
+            width=logo_width,
+            height=logo_height,
+            preserveAspectRatio=True,
+            anchor='sw',
+            mask='auto'
+        )
 
+        # Draw centered page number
         canvas.setFont("Times-Italic", 8)
         canvas.setFillColor(colors.HexColor("#DCB68A"))  # Golden
         canvas.drawCentredString(self.PAGE_WIDTH / 2, self.MARGIN + 5 * mm, f"Page {doc.page}")
+
         canvas.restoreState()
+
 
     def add_cover_page(self, project_name="[Project Name]", author="[Author Name]", date="[DD/MM/YYYY]"):
         self.story.append(Spacer(1, 100))
@@ -141,51 +165,77 @@ class FormalReport:
         return flowables
 
 
-    def add_subsection_with_image(self, title, location, proposed_sentences, image_path, width=80, height=60):
+    def add_subsection_with_image(self, title, location, proposed_sentences, image_path, width=120, height=60):
 
-        self.story.append(Paragraph("<u>{}</u>".format(title), self.styles["SubSectionTitle"]))
+        self.story.append(KeepTogether(Paragraph("<u>{}</u>".format(title), self.styles["SubSectionTitle"])))
+
+        PAGE_WIDTH, PAGE_HEIGHT = A4
+        MAX_WIDTH = (2*PAGE_WIDTH) / 3  # Half the page width
 
         if os.path.exists(image_path):
-            self.story.append(Image(image_path, width=width, height=height))
+            img_reader = ImageReader(image_path)
+            iw, ih = img_reader.getSize()
+            aspect = ih / float(iw)
+
+            # Scale width to half the page, adjust height to maintain aspect ratio
+            scaled_width = MAX_WIDTH
+            scaled_height = scaled_width * aspect
+
+            # Optional: limit height if needed
+            if scaled_height > PAGE_HEIGHT * 0.8:
+                scaled_height = PAGE_HEIGHT * 0.8
+                scaled_width = scaled_height / aspect
+
+            img = Image(image_path, width=scaled_width, height=scaled_height)
+            self.story.append(img)
         square = "*"
         possible_sentences = []
         for m, prop in enumerate(proposed_sentences):
             possible_sentences.append(prop["sentence"])
         possible_sentences = ", ".join(possible_sentences)
-        self.story.append(Paragraph(f"- <b>Location:</b> {location}", self.styles["BulletText"]))
-        self.story.append(Paragraph(f"- <b>Possible phrases:</b> {possible_sentences}", self.styles["BulletText"]))
-
+        self.story.append(KeepTogether(Paragraph(f"- <b>Location:</b> {location}", self.styles["BulletText"])))
+        self.story.append(KeepTogether(Paragraph(f"- <b>Possible phrases:</b> {possible_sentences}", self.styles["BulletText"])))
 
         alphabet_list = list(string.ascii_lowercase)
-
         for idx, prop in enumerate(proposed_sentences):
             self.story.append(Spacer(1, 15))
-            text = "<b>Option {}</b>".format(alphabet_list[idx].capitalize())#,prop["sentence"])
-            self.story.append(Paragraph(text, self.styles['SubSubSectionTitle']))
+            if idx != 0:
+                text = "\u27A4  <font size=14><b>{}</b></font>".format(prop["sentence"])#,prop["sentence"])
+            else:
+                text = "\u27A4  <font size=14><b>{}</b></font> <i>(Most probable translation)</i>".format(prop["sentence"])#,prop["sentence"])
+                
+            self.story.append(KeepTogether(Paragraph(text, self.styles['SubSubSectionTitle'])))
             self.story.append(Spacer(1, 4))
-            text2 = '&nbsp;&nbsp;&nbsp;-Text:<b>"{}"</b>'.format(prop["sentence"])
-            self.story.append(Paragraph(text2, self.styles['SubSectionText']))
+            text2 = '&nbsp;&nbsp;&nbsp;-Text: <b>"{}"</b>'.format(prop["sentence"])
+            self.story.append(KeepTogether(Paragraph(text2, self.styles['SubSectionText'])))
             self.story.append(Spacer(1, 2))
+            text2 = '&nbsp;&nbsp;&nbsp;-Probability: {}%'.format(prop["probability"])
+            self.story.append(KeepTogether(Paragraph(text2, self.styles['SubSectionText'])))
+            self.story.append(Spacer(1, 2))
+            #text2 = '&nbsp;&nbsp;&nbsp;-Syntax:<b>"{}"</b>'.format(prop["syntax"])
+            #self.story.append(Paragraph(text2, self.styles['SubSectionText']))
+            #self.story.append(Spacer(1, 2))
             text2 = '&nbsp;&nbsp;&nbsp;-Translations:'
-            self.story.append(Paragraph(text2, self.styles['SubSectionText']))
+            self.story.append(KeepTogether(Paragraph(text2, self.styles['SubSectionText'])))
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>english</i>: {}'.format(prop["translations"]["english"])
-            self.story.append(Paragraph(texttrans, self.styles['BulletText']))
+            self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>german</i>: {}'.format(prop["translations"]["german"])
-            self.story.append(Paragraph(texttrans, self.styles['BulletText']))
+            self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>danish</i>: {}'.format(prop["translations"]["danish"])
-            self.story.append(Paragraph(texttrans, self.styles['BulletText']))
+            self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             self.story.append(Spacer(1, 2))
             text3 = '&nbsp;&nbsp;&nbsp;-Word analysis:'
-            self.story.append(Paragraph(text3, self.styles['SubSectionText']))            
+            self.story.append(KeepTogether(Paragraph(text3, self.styles['SubSectionText'])))
 
             # Prepare the data with Paragraphs
-            word_data = [["Word", "Definition", "Synonyms", "Antonyms"]]
+            word_data = [["Word", "Definition", "Synonyms", "Antonyms", "Etymology"]]
             for word in prop["word_analysis"]:
                 word_data.append([
                     Paragraph(word, self.styles["WrappedText"]),
                     Paragraph(prop["word_analysis"][word]["definition"],  self.styles["WrappedText"]),
                     Paragraph(", ".join(prop["word_analysis"][word]["synonyms"]),  self.styles["WrappedText"]),
-                    Paragraph(", ".join(prop["word_analysis"][word]["antonyms"]),  self.styles["WrappedText"])
+                    Paragraph(", ".join(prop["word_analysis"][word]["antonyms"]),  self.styles["WrappedText"]),
+                    Paragraph(", ".join(prop["word_analysis"][word]["etymology"]),  self.styles["WrappedText"])
                 ])
 
             # Create the table
@@ -206,7 +256,7 @@ class FormalReport:
 
             # Add to story
             self.story.append(Spacer(1, 12))
-            self.story.append(word_table)
+            self.story.append(KeepTogether(word_table))
 
         self.story.append(Spacer(1, 15))
 

@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
+
+from style_helpers import style_button, style_tabs, apply_fonts
+
 from luvia_gui.config.options_config import categories
 from luvia_gui.backend.backend_worker import BackendWorker
 
@@ -16,6 +19,7 @@ class InputPanel(QWidget):
         super().__init__()
         self.inputs = {}
         self.run_button = QPushButton("Run")
+        style_button(self.run_button)
         self.worker = None
         self.init_ui()
 
@@ -26,6 +30,7 @@ class InputPanel(QWidget):
         self.input_file_field.setPlaceholderText("Select input file")
         self.input_file_field.setReadOnly(True)
         self.file_button = QPushButton("Browse")
+        style_button(self.file_button)
         self.file_button.clicked.connect(self.select_input_file)
 
         file_layout = QHBoxLayout()
@@ -40,6 +45,7 @@ class InputPanel(QWidget):
         self.input_folder_field.setReadOnly(True)
         self.input_folder_field.setVisible(False)
         self.folder_button = QPushButton("Browse")
+        style_button(self.folder_button)
         self.folder_button.setVisible(False)
         self.folder_button.clicked.connect(self.select_input_folder)
 
@@ -54,6 +60,7 @@ class InputPanel(QWidget):
         self.output_folder_field = QLineEdit()
         self.output_folder_field.setPlaceholderText("Select output folder")
         output_button = QPushButton("Browse")
+        style_button(output_button)
         output_button.clicked.connect(self.select_output_folder)
         output_layout.addWidget(self.output_folder_field)
         output_layout.addWidget(output_button)
@@ -62,6 +69,7 @@ class InputPanel(QWidget):
         layout.addLayout(output_layout)
 
         tabs = QTabWidget()
+        style_tabs(tabs)
         for category, options in categories.items():
             tab = QWidget()
             form_layout = QFormLayout()
@@ -85,6 +93,8 @@ class InputPanel(QWidget):
         layout.addWidget(tabs)
         layout.addWidget(self.run_button)
         self.setLayout(layout)
+
+        apply_fonts(self)
 
         #self.run_button.clicked.connect(self.run_backend)
 

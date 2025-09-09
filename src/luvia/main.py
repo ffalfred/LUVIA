@@ -17,7 +17,7 @@ from luvia.utils.output_utils import OutUtils
 
 class LUVIA:
 
-    def __init__(self, inverted_img, out_folder, mode="main"):
+    def __init__(self, inverted_img, out_folder, user, mode="main"):
         if mode in ["main", "tongue", "hoof", "straw", "horde"]:
             self.mode = mode
             if mode != "main" or mode != "horde":
@@ -26,16 +26,16 @@ class LUVIA:
             ValueError("Mode {} not available".format(mode))
 
         self.out_module = OutUtils(base_folder=out_folder, mode=mode)
-        self.inverted_img = not inverted_img
+        self.inverted_img = inverted_img
         self.number_proc = 0
+        self.username = user
 
     def first_step(self, image_path, invert=False):
         image = ImageUtils.load_image(image_path=image_path)
         if invert:
             image = ImageUtils.invert_image(image)
         self.out_module.save_image(image, prefix=str(self.number_proc),
-                                    suffix="original", inverse=self.inverted_img)
-
+                                    suffix="original", inverse=True)
         return image
     
     def _clean_image(self, image, clean_image, clean_args):
@@ -47,14 +47,14 @@ class LUVIA:
                                                                         **clean_args)
         self.number_proc += 1
         self.out_module.save_image(cleaned_image, prefix=str(self.number_proc), 
-                                    suffix="cleaned", inverse=self.inverted_img)
+                                    suffix="cleaned", inverse=True)
         return cleaned_image
 
     def _rotate_image(self, image, angle):
         self.number_proc += 1
         image_rotated = ImageUtils.rotate_image(image, angle=angle)
         self.out_module.save_image(image_rotated, prefix=str(self.number_proc),
-                                        suffix="rotated", inverse=self.inverted_img)
+                                        suffix="rotated", inverse=True)
         return image_rotated
         
     def _extract_sentences(self, image_rotated, extract_sentences, extract_lines_args):
@@ -75,21 +75,29 @@ class LUVIA:
             ValueError("That option is not available")
         self.number_proc += 1
         self.out_module.save_image(image_contours, prefix=str(self.number_proc),
-                                suffix="contours", inverse=self.inverted_img)
+                                suffix="contours", inverse=True)
 
         return image_contours, lines
     
     def _extract_characters(self, line, line_count, extract_character_args):
         self.out_module.save_image(line, folder="line", prefix="",
                             suffix="image_line-{}".format(line_count))
+        self.out_module.image_objects["lines"]["line-{}".format(line_count)] = {}
+        self.out_module.image_objects["lines"]["line-{}".format(line_count)]["base"] = line
         image_color, characters, params_vproj = Hoof_VThresh.vertical_projection_segmentation(line, **extract_character_args)
         self.out_module.save_projection_image(image_color, prefix="image_vertical_projection_line_{}".format(line_count),
                         projection=params_vproj["projection"], minima=params_vproj["minima"],
-                        maxima=params_vproj["maxima"])
+                        maxima=params_vproj["maxima"], line_count=line_count, inverse=True)
+        self.out_module.image_objects["lines"]["line-{}".format(line_count)]["line_div"] = image_color
+        self.out_module.image_objects["lines"]["line-{}".format(line_count)]["line_div_params"] = params_vproj
+        self.out_module.image_objects["lines"]["line-{}".format(line_count)]["characters"] = {}
         char_count = 0
-        for char in characters:
+        for idx,char in enumerate(characters):
+            self.out_module.image_objects["lines"]["line-{}".format(line_count)]["characters"]["character-{}".format(idx)] = {}
+            self.out_module.image_objects["lines"]["line-{}".format(line_count)]["characters"]["character-{}".format(idx)]["original"] = char
             self.out_module.save_image(char, folder="character",prefix="", 
-                                suffix="image_line-{}_character-{}".format(line_count, char_count), inverse=(not self.inverted_img))
+                                suffix="image_line-{}_character-{}".format(line_count, char_count), inverse=self.inverted_img)
+            
             char_count += 1
         return characters
     
@@ -98,7 +106,7 @@ class LUVIA:
         dataloader = straw.load_data(characters, notransform_input)
         results = straw.infer_model(dataloader, **infer_model_args)
         outputs = []
-        for k, val in results.items():
+        for idx, (k, val) in enumerate(results.items()):
             key = "line-{}_{}".format(line_count, k.lower().replace(" ", "-"))
             self.out_module.image_paths[key+"_dict"] = {}
             self.out_module.plot_feature_maps(activation=val["act1"], prefix="cnn_featmap1", suffix=key)
@@ -109,9 +117,8 @@ class LUVIA:
             self.out_module.plot_saliency(saliency=val["saliency"], prefix="cnn_saliency", suffix=key)
             self.out_module.plot_sensitivity(sensitivity=val["sensitivity"], prefix="cnn_sensitivity", suffix=key)
             self.out_module.plot_guidedbackprop(gb_grad=val["gb_grad"], prefix="cnn_guidedbackprop", suffix=key)
-            self.out_module.plot_allchar_images(suffix=key)
             outputs.append(val["output"])
-        self.out_module.plot_allsentence_images(line_num=line_count, amount_charact=len(results))
+        #self.out_module.plot_allsentence_images(line_num=line_count, amount_charact=len(results))
         return outputs
     
     def _morph_sentence(self, outputs, dictionary, character, corrected_k, sel_sentence,
@@ -126,8 +133,9 @@ class LUVIA:
                                                     k=final_sentences)
         for sentence in quantiled_sentences:
             sentences_demo.append(sentence["sentence"])
-            extra_metadaa = Tongue.analyze_sentence(sentence["sentence"])
+            extra_metadaa = tongue.charcterize_sentence(sentence["sentence"])
             sentence.update(extra_metadaa)
+            sentence["probability"] = Tongue.perplexity_to_score_log(sentence["perplexity"])
         return sentences_demo, quantiled_sentences
     
     
@@ -135,21 +143,21 @@ class LUVIA:
                 clean_args=dict(), extract_images="cca", extract_lines_args=dict(),
                 extract_character_args=dict(), infer_model_args=dict(),
                 sentences_model_args=dict(), random_pick=False):
-
+        print("======================= ANALYZING STREET IMAGE =======================")
         self.image = self.first_step(image_path=image_path, invert=self.inverted_img)
 
         if not clean_image_mode:
             cleaned_image = self.image
         else:
+            print("======================= CLEANING STREET IMAGE =======================")
             cleaned_image = self._clean_image(image=self.image, clean_image=clean_image_mode,
                                                 clean_args=clean_args)
-
+        print("======================= ROTATING STREET IMAGE =======================")
         image_rotated = self._rotate_image(image=cleaned_image, angle=rotate_image)
-
+        print("======================= EXTRACTING SMEDT SHORTHAND SENTENCES =======================")
         image_contours, lines = self._extract_sentences(image_rotated=image_rotated,
                                                         extract_sentences=extract_images,
                                                         extract_lines_args=extract_lines_args)
-
         self.out_module.plot_alltransformations()
         straw = Straw()
         weights_straw = infer_model_args.pop("weights")
@@ -164,22 +172,33 @@ class LUVIA:
         sentences_demo = []
         if random_pick:
             random.shuffle(lines)
+        print("======================= TRANSLATING SMEDT SHORTHAND SENTENCES =======================")
         for line_count, line in tqdm(enumerate(lines)):
+            print("======================= TRANSLATING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
             characters = self._extract_characters(line, line_count, extract_character_args)
             outputs = self._translate_characters(characters, straw=straw, notransform_input=notransform_input,
                                                 line_count=line_count, infer_model_args=infer_model_args)
             if len(outputs) == 0:
                 print("Sentence {} doesnt have any character".format(line_count))
                 continue
+            print("======================= MORPHING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
             candidate_sentences, sentences_info = self._morph_sentence(outputs=outputs,
                                                     dictionary=dictionary, character=character,
                                                       corrected_k=corrected_k, sel_sentence=sel_sentence,
                                                       quantile=quantile, final_sentences=final_sentences)
             sentences_demo.append(sentences_info)
+            print(candidate_sentences[0])
+            for k, word in enumerate(candidate_sentences[0].split(" ")):
+                key = "line-{}_character-{}".format(line_count, k)
+                try:
+                    self.out_module.plot_allchar_images(suffix=key, line_count=line_count,
+                                                    word=word, sentence=candidate_sentences[0])
+                except KeyError:
+                    break
+            break
             if random_pick:
                 break
-        print(self.out_module.image_paths)
-        self.out_module.create_pdfimage()
+        #self.out_module.create_pdfimage()
         self.out_module.create_pdftranslation(sentences_demo)
         return sentences_demo, self.out_module.output_folder
 
@@ -218,26 +237,32 @@ class LUVIA:
             
             main_instance = self.__class__(inverted_img=self.inverted_img,
                                             out_folder=self.out_module.output_folder,
+                                            user=self.username,
                                             mode="main")
-            
-            sentences, out_folder= main_instance.main(image_path=file_path, rotate_image=angle,
+            try:
+                sentences, out_folder= main_instance.main(image_path=file_path, rotate_image=angle,
                                         clean_image_mode="OTSA", clean_args=clean_args.copy(),
                                         extract_images="cca", extract_lines_args=extract_lines_args.copy(),
                                         extract_character_args=extract_character_args.copy(),
                                         infer_model_args=infer_model_args.copy(),
                                         sentences_model_args=sentences_model_args.copy(),
                                         random_pick=True)
+            except TypeError:
+                continue
+            shutil.copy("{}/image-transformation.jpg".format(out_folder),
+                        "{}/images/image-transformation.jpg".format(self.out_module.output_folder))
             runs_folder.append(out_folder)
+            sentence_num = 0
             entry ={"sentence": sentences[0][0]["sentence"],
                     "location": "{}--56,24".format(file_key),
-                    "image": "{}/images/cnn_images/sentence-spectrum.jpg".format(out_folder),
+                    "image": ["{}/images/line_images/_image_line-{}.jpg".format(out_folder, sentence_num),
+                              "{}/images/3_contours.jpg".format(out_folder, sentence_num)],
                     "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
                     "id": os.path.basename(out_folder)
                     }
             self._write_jsonfile(json_path=json_path, new_entry=entry)
             if len(runs_folder) >=max_runs:
                 fold_del = runs_folder.pop(0)
-
                 if os.path.exists(fold_del):
                     try:
                         shutil.rmtree(fold_del)
@@ -271,7 +296,8 @@ def main():
         hoofh_args = False
 
     ## Commands ##
-    l = LUVIA(inverted_img=largs.invert_image, out_folder=largs.output, mode=largs.command)
+    l = LUVIA(inverted_img=largs.inverted_image, out_folder=largs.output,
+              user=largs.user, mode=largs.command)
     if largs.command == "clean":
         l.clean(clean_image_mode=largs.clean_mode, clean_args=clean_args)
     elif largs.command == "hoof":

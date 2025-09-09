@@ -13,6 +13,10 @@ class AppState(QObject):
         self._mode = "main"
         self._input_folder = ""
         self._output_folder = ""
+        self.history_path = ""
+
+    def get_history_path(self):
+        return self.history_path
 
     # Mode
     def set_mode(self, mode: str):
