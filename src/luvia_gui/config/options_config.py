@@ -1,4 +1,5 @@
-categories = {'Cleaning':
+categories = {
+            'Cleaning':
               {'Blur Kernel': ('--blur_kernel', 'entry', '5,5', 'Kernel size for blurring'),
                 'Blur Sigma': ('--blur_sigma', 'entry', '0', 'Sigma value for Gaussian blur'),
                 'Block Size': ('--block_size', 'entry', '15', 'Block size for adaptive thresholding'),
@@ -36,4 +37,7 @@ categories = {'Cleaning':
                       'Temperature': ('--temperature', 'entry', '1.0', 'Sampling temperature'),
                       'K': ('--k', 'entry', '1', 'K value'),
                       'No Transform Input': ('--notransform_input', 'checkbox', None, 'Skip input transformation'),
-                      }}
+                      },
+            'Miscellanea':
+              {'User Name': ('--user', 'entry', '', 'Username'),
+               "Inverted Image": ("--inverted_image", "checkbox", True, "Check if image is inverted")}}

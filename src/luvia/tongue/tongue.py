@@ -40,9 +40,9 @@ class Tongue:
         if match_mode:
             self.dictmatch_module = DictMatch(db_words=db_words)
             if match_mode == "character_POS":
-                self.character_features = Tongue.load_character(character)
+                self.character_features, self.character = Tongue.load_character(character)
             else:
-                self.character_features = None
+                self.character_features, self.character = None
         else:
             self.dictmatch_module = None
         self.match_mode = match_mode
@@ -85,7 +85,7 @@ class Tongue:
         character_features["all_templates"] = []
         for k, val in character_features["templates"].items():
             character_features["all_templates"].extend(val)
-        return character_features
+        return character_features, file_chosen
 
     def create_sentences(self, word_buckets, sample_min=40):
         final_buckets = []
@@ -303,21 +303,11 @@ class Tongue:
 
     def charcterize_sentence(self, sentence):
         # Translations
-        languages = ['german', 'english', 'danish', 'norwegian']
+        languages = ['german', 'english', 'danish', "ar", "la", 'spanish']
         translations = {
             lang: GoogleTranslator(source='auto', target=lang).translate(sentence)
             for lang in languages
         }
-
-        ## Syntactic analysis
-        #doc = self.nlp(sentence)
-        #syntax = [{
-        #    "text": token.text,
-        #    "pos": token.pos_,
-        #    "dep": token.dep_,
-        #    "head": token.head.text
-        #} for token in doc]
-
         # Word-level analysis
         words = sentence.split()
         word_info = {}

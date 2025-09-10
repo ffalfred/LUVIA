@@ -3,11 +3,12 @@ from PyQt6.QtWidgets import QApplication
 from app_state import AppState
 from luvia_gui.windows.main_control import MainControlWindow
 from luvia_gui.windows_manager import WindowManager
+from luvia_gui.styles import apply_dark_theme_main
 
 def main():
     import sys
     app = QApplication(sys.argv)
-
+    apply_dark_theme_main(app)
     # Create shared AppState
     app_state = AppState()
 
@@ -16,6 +17,8 @@ def main():
     screens = app.screens()
     if screens:
         main_control_window.move(screens[0].geometry().topLeft())
+#    main_control_window.showMaximized()
+#    main_control_window.resize(1920, 800)
     main_control_window.show()
 
     # Create and launch dynamic windows

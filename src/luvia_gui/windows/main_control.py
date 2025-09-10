@@ -13,7 +13,7 @@ from luvia_gui.components.loop_mode_view import LoopModeView
 from luvia_gui.windows.json_viewer_window import HistoryView
 from app_state import AppState
 from PyQt6.QtCore import Qt
-
+from PyQt6.QtWidgets import QSizePolicy
 from PyQt6.QtGui import QPixmap, QTransform
 
 from PyQt6.QtWidgets import QFileDialog
@@ -24,12 +24,14 @@ import time
 from luvia_gui.windows.pdf_image_combined_window import PDFImageCombinedWindow
 
 
-class MainControlWindow(QWidget):
+class MainControlWindow(QMainWindow):
     def __init__(self, app_state: AppState):
         super().__init__()
         self.app_state = app_state
         self.setWindowTitle("LUVIA Control Panel")
-        self.setGeometry(100, 100, 1200, 800)
+#        self.setGeometry(100, 100, 1200, 800)
+#        self.resize(1200,800)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Top controls
         self.mode_label = QLabel("Mode: Main")
@@ -111,7 +113,10 @@ class MainControlWindow(QWidget):
         layout.addLayout(top_layout)
         layout.addLayout(main_layout)
         #layout.addLayout(self.stack_layout)
-        self.setLayout(layout)
+  ##      self.setLayout(layout)
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
 
         # React to AppState changes
         self.app_state.mode_changed.connect(self.on_mode_changed)

@@ -23,7 +23,7 @@ from reportlab.lib.utils import ImageReader
 
 
 class FormalReport:
-    def __init__(self, filename="formal_report.pdf"):
+    def __init__(self, filename="formal_report.pdf", location="Unknown", agent="Unknown"):
         self.filename = filename
         self.PAGE_WIDTH, self.PAGE_HEIGHT = A4
         self.MARGIN = 20 * mm
@@ -42,7 +42,8 @@ class FormalReport:
         self.story = []
         self.footer_logo_path = "{}/gifs/signal-2025-08-23-160817_002.png".format(os.path.dirname(os.path.abspath(__file__)))
         self.logo_path = "{}/gifs/signal-2025-08-25-003555_002.png".format(os.path.dirname(os.path.abspath(__file__)))
-
+        self.location = location
+        self.agent = agent.split("_")[0]
         self.styles_list= getSampleStyleSheet()
 
     def _init_styles(self):
@@ -71,8 +72,8 @@ class FormalReport:
         canvas.drawRightString(self.PAGE_WIDTH - self.MARGIN, self.PAGE_HEIGHT - 20 * mm, "LUVIA Technical Report")
 
         canvas.setFont("Times-Roman", 11)
-        canvas.drawRightString(self.PAGE_WIDTH - self.MARGIN, self.PAGE_HEIGHT - 26 * mm, "Agent: [Your Agent Here]")
-        canvas.drawRightString(self.PAGE_WIDTH - self.MARGIN, self.PAGE_HEIGHT - 32 * mm, "Location: [Your Location Here]")
+        canvas.drawRightString(self.PAGE_WIDTH - self.MARGIN, self.PAGE_HEIGHT - 26 * mm, "Agent: {}".format(self.agent))
+        canvas.drawRightString(self.PAGE_WIDTH - self.MARGIN, self.PAGE_HEIGHT - 32 * mm, "Location: {}".format(self.location))
 
         # Divider lines (moved up slightly)
         canvas.setLineWidth(4)
@@ -142,7 +143,7 @@ class FormalReport:
         self.story.append(Paragraph("&nbsp;{}".format(text), self.styles['FormalBodyText']))
         if os.path.exists(image_path):
             self.story.append(Spacer(1, 12))  # Add space before image
-            self.story.append(Image(image_path, width=(self.PAGE_WIDTH/3)*2, height=height*4))
+            self.story.append(Image(image_path, width=(self.PAGE_WIDTH/5)*4, height=height*4))
             self.story.append(Spacer(1, 12))  # Add space before image
         self.story.append(Spacer(1, 20))
 
@@ -194,7 +195,7 @@ class FormalReport:
             possible_sentences.append(prop["sentence"])
         possible_sentences = ", ".join(possible_sentences)
         self.story.append(KeepTogether(Paragraph(f"- <b>Location:</b> {location}", self.styles["BulletText"])))
-        self.story.append(KeepTogether(Paragraph(f"- <b>Possible phrases:</b> {possible_sentences}", self.styles["BulletText"])))
+        self.story.append(KeepTogether(Paragraph(f"- <b>Proposed sentences:</b> {possible_sentences}", self.styles["BulletText"])))
 
         alphabet_list = list(string.ascii_lowercase)
         for idx, prop in enumerate(proposed_sentences):
@@ -222,6 +223,12 @@ class FormalReport:
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>german</i>: {}'.format(prop["translations"]["german"])
             self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>danish</i>: {}'.format(prop["translations"]["danish"])
+            self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
+            texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>arabic</i>: {}'.format(prop["translations"]["ar"])
+            self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
+            texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>latin</i>: {}'.format(prop["translations"]["la"])
+            self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
+            texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>spanish</i>: {}'.format(prop["translations"]["spanish"])
             self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             self.story.append(Spacer(1, 2))
             text3 = '&nbsp;&nbsp;&nbsp;-Word analysis:'

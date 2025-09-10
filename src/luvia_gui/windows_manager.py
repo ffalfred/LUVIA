@@ -9,7 +9,7 @@ class HistoryWindow(QMainWindow):
     def __init__(self, jsonl_path: str):
         super().__init__()
         self.setWindowTitle("History Viewer")
-        self.setGeometry(100, 100, 800, 600)
+#        self.setGeometry(100, 100, 800, 600)
         self.view = HistoryView(jsonl_path)
         self.setCentralWidget(self.view)
 

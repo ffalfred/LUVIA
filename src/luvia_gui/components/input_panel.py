@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
-
+from PyQt6.QtGui import QFont
 from style_helpers import style_button, style_tabs, apply_fonts
 
 from luvia_gui.config.options_config import categories
@@ -53,7 +53,7 @@ class InputPanel(QWidget):
         folder_layout.addWidget(self.input_folder_field)
         folder_layout.addWidget(self.folder_button)
 
-        layout.addWidget(QLabel("Input Folder"))
+        #layout.addWidget(QLabel("Input Folder"))
         layout.addLayout(folder_layout)
 
         output_layout = QHBoxLayout()
@@ -70,6 +70,7 @@ class InputPanel(QWidget):
 
         tabs = QTabWidget()
         style_tabs(tabs)
+        small_font = QFont("Courier Neue", 10)
         for category, options in categories.items():
             tab = QWidget()
             form_layout = QFormLayout()
@@ -77,15 +78,23 @@ class InputPanel(QWidget):
                 if widget_type == "entry":
                     input_widget = QLineEdit()
                     input_widget.setText(default)
+                    input_widget.setFont(small_font)
+                    input_widget.setFixedHeight(20)
                 elif widget_type == "dropdown":
                     input_widget = QComboBox()
                     input_widget.addItems(default)
+                    input_widget.setFont(small_font)
+                    input_widget.setFixedHeight(20)
                 elif widget_type == "checkbox":
                     input_widget = QCheckBox()
                     input_widget.setChecked(False if default in ["", None, "False"] else True)
+                    input_widget.setFont(small_font)
+                    input_widget.setFixedHeight(20)
                 else:
                     continue
-                form_layout.addRow(QLabel(f"{label} ({flag})"), input_widget)
+                label_widget = QLabel(f"{label} ({flag})")
+                label_widget.setFont(QFont("Courier Neue", 10))
+                form_layout.addRow(label_widget, input_widget)
                 self.inputs[flag] = input_widget
             tab.setLayout(form_layout)
             tabs.addTab(tab, category)

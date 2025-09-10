@@ -35,7 +35,7 @@ class LUVIA:
         if invert:
             image = ImageUtils.invert_image(image)
         self.out_module.save_image(image, prefix=str(self.number_proc),
-                                    suffix="original", inverse=True)
+                                    suffix="original", inverse=True, angle=-90, general=True)
         return image
     
     def _clean_image(self, image, clean_image, clean_args):
@@ -47,7 +47,7 @@ class LUVIA:
                                                                         **clean_args)
         self.number_proc += 1
         self.out_module.save_image(cleaned_image, prefix=str(self.number_proc), 
-                                    suffix="cleaned", inverse=True)
+                                    suffix="cleaned", inverse=True, angle=-90, general=True)
         return cleaned_image
 
     def _rotate_image(self, image, angle):
@@ -136,9 +136,13 @@ class LUVIA:
             extra_metadaa = tongue.charcterize_sentence(sentence["sentence"])
             sentence.update(extra_metadaa)
             sentence["probability"] = Tongue.perplexity_to_score_log(sentence["perplexity"])
-        return sentences_demo, quantiled_sentences
+        return sentences_demo, quantiled_sentences, tongue.character
     
-    
+    @staticmethod
+    def binary_with_probability(x):
+        return 1 if random.random() < x else 0
+
+
     def main(self, image_path, rotate_image=0, clean_image_mode="OTSA",
                 clean_args=dict(), extract_images="cca", extract_lines_args=dict(),
                 extract_character_args=dict(), infer_model_args=dict(),
@@ -176,30 +180,34 @@ class LUVIA:
         for line_count, line in tqdm(enumerate(lines)):
             print("======================= TRANSLATING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
             characters = self._extract_characters(line, line_count, extract_character_args)
+            if random_pick and LUVIA.binary_with_probability(0.4):
+                if len(characters) == 1:
+                    continue
             outputs = self._translate_characters(characters, straw=straw, notransform_input=notransform_input,
                                                 line_count=line_count, infer_model_args=infer_model_args)
             if len(outputs) == 0:
                 print("Sentence {} doesnt have any character".format(line_count))
                 continue
             print("======================= MORPHING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
-            candidate_sentences, sentences_info = self._morph_sentence(outputs=outputs,
+            candidate_sentences, sentences_info, character_chosen = self._morph_sentence(outputs=outputs,
                                                     dictionary=dictionary, character=character,
                                                       corrected_k=corrected_k, sel_sentence=sel_sentence,
                                                       quantile=quantile, final_sentences=final_sentences)
             sentences_demo.append(sentences_info)
-            print(candidate_sentences[0])
-            for k, word in enumerate(candidate_sentences[0].split(" ")):
+            for k, word in enumerate(sentences_info[0]["sentence"].split(" ")):
                 key = "line-{}_character-{}".format(line_count, k)
                 try:
                     self.out_module.plot_allchar_images(suffix=key, line_count=line_count,
-                                                    word=word, sentence=candidate_sentences[0])
+                                                    word=word, sentence_info=sentences_info[0])
                 except KeyError:
                     break
-            break
+            #break
             if random_pick:
                 break
         #self.out_module.create_pdfimage()
-        self.out_module.create_pdftranslation(sentences_demo)
+        location = os.path.basename(image_path).split(".")[0]
+        self.out_module.create_pdftranslation(user=self.username,character=character_chosen,
+                                              sentences_data=sentences_demo, location=location)
         return sentences_demo, self.out_module.output_folder
 
     def _getstreets(self, folder_streets):
@@ -241,12 +249,12 @@ class LUVIA:
                                             mode="main")
             try:
                 sentences, out_folder= main_instance.main(image_path=file_path, rotate_image=angle,
-                                        clean_image_mode="OTSA", clean_args=clean_args.copy(),
-                                        extract_images="cca", extract_lines_args=extract_lines_args.copy(),
-                                        extract_character_args=extract_character_args.copy(),
-                                        infer_model_args=infer_model_args.copy(),
-                                        sentences_model_args=sentences_model_args.copy(),
-                                        random_pick=True)
+                                                clean_image_mode="OTSA", clean_args=clean_args.copy(),
+                                                extract_images="cca", extract_lines_args=extract_lines_args.copy(),
+                                                extract_character_args=extract_character_args.copy(),
+                                                infer_model_args=infer_model_args.copy(),
+                                                sentences_model_args=sentences_model_args.copy(),
+                                                random_pick=True)
             except TypeError:
                 continue
             shutil.copy("{}/image-transformation.jpg".format(out_folder),

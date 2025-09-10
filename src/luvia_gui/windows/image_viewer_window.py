@@ -45,6 +45,8 @@ class ImageViewerWindow(QMainWindow):
         self.image_label = QLabel("No image loaded")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scroll_area.setWidget(self.image_label)
+        self.scroll_area.setStyleSheet("background-color: black;")
+        self.image_label.setStyleSheet("background-color: black;")
         self.main_layout.addWidget(self.scroll_area)
 
         # Connect buttons
@@ -84,8 +86,9 @@ class ImageViewerWindow(QMainWindow):
     def update_image_display(self):
         pixmap = QPixmap(self.current_image_path)
         if not pixmap.isNull():
+            scroll_area_size = self.scroll_area.viewport().size()
             scaled_pixmap = pixmap.scaled(
-                pixmap.size() * self.zoom_factor,
+                scroll_area_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
@@ -155,7 +158,8 @@ class ImageView(QWidget):
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("background-color: white;")
+        self.scroll_area.setStyleSheet("background-color: black;")
+        self.image_label.setStyleSheet("background-color: black;")
         layout.addWidget(self.scroll_area)
 
         self.scroll_content = QWidget()
