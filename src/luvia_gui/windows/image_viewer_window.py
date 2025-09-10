@@ -238,17 +238,28 @@ class ImageView(QWidget):
         # Load reference image
         if os.path.exists(self.reference_image_path):
             ref_pixmap = QPixmap(self.reference_image_path)
-            self.reference_label.setPixmap(ref_pixmap)
+            scaled_ref = ref_pixmap.scaled(
+                ref_pixmap.size() * self.zoom_factor,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.reference_label.setPixmap(scaled_ref)
         else:
             self.reference_label.setText(f"Reference image not found: {self.reference_image_path}")
 
         # Load dynamic image
         if os.path.exists(self.dynamic_image_path):
             dyn_pixmap = QPixmap(self.dynamic_image_path)
-            self.dynamic_label.setPixmap(dyn_pixmap)
+            scaled_dyn = dyn_pixmap.scaled(
+                dyn_pixmap.size() * self.zoom_factor,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.dynamic_label.setPixmap(scaled_dyn)
             self.last_modified = os.path.getmtime(self.dynamic_image_path)
         else:
             self.dynamic_label.setText(f"Dynamic image not found: {self.dynamic_image_path}")
+
 
     def check_for_update(self):
         if not os.path.exists(self.dynamic_image_path):
