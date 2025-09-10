@@ -28,10 +28,10 @@ from luvia.utils.pdf_utils import FormalReport
 
 class OutUtils:
 
-    def __init__(self, base_folder, mode):
+    def __init__(self, base_folder, mode, filename):
         self.base_folder = base_folder
 
-        self.output_folder, self.name = self.create_outfolder(base_folder, mode)
+        self.output_folder, self.name = self.create_outfolder(base_folder, mode, filename)
         if mode == "main":
             (self.img_path, self.lineimg_path,
                 self.character_img_path, self.cnnimg_path) = self.make_subfolders()
@@ -57,13 +57,13 @@ class OutUtils:
         cnnimg_path.mkdir(parents=True, exist_ok=True)
         return img_path, lineimg_path, charimg_path, cnnimg_path
 
-    def create_outfolder(self, base_folder, mode):
+    def create_outfolder(self, base_folder, mode, filename):
         if mode != "horde":
             # Get current date and time
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             # Generate a 12-character unique ID using UUID
             unique_id = uuid.uuid4()
-            name_folder = "LUVIA-RUN-{}_{}_{}".format(mode, timestamp,unique_id)
+            name_folder = "{}_LUVIA-RUN_{}_{}_{}".format(filename, mode, timestamp,unique_id)
             # Build the path
             folder_path = Path(base_folder) / name_folder
             # Create the directory
@@ -326,7 +326,7 @@ class OutUtils:
                     fontsize=22, color='white', transform=title_ax.transAxes)
 
         fig.text(ax1_left, 0.975,
-                "Sentence Fragmentation:", ha='left', va='top',
+                "Sentence Fragmentation", ha='left', va='top',
                 fontsize=22, color='white')
         
         word_cleaned = word.translate(str.maketrans('', '', string.punctuation))

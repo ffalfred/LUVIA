@@ -303,7 +303,7 @@ class Tongue:
 
     def charcterize_sentence(self, sentence):
         # Translations
-        languages = ['german', 'english', 'danish', "ar", "la", 'spanish']
+        languages = ['german', 'english', 'danish', "swedish", "la", 'spanish']
         translations = {
             lang: GoogleTranslator(source='auto', target=lang).translate(sentence)
             for lang in languages

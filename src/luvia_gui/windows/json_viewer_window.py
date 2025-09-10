@@ -70,7 +70,13 @@ class HistoryView(QWidget):
 
 
     def create_entry_widget(self, idx, data):
-        sentence = data.get("sentence", "")
+        sentence1 = data.get("sentence0", {}).get("sentence", "")
+        sentence2 = data.get("sentence1", {}).get("sentence", "")
+        sentence3 = data.get("sentence2", {}).get("sentence", "")
+        probability1 = data.get("sentence0", {}).get("probability", 0.)
+        probability2 = data.get("sentence1", {}).get("probability", 0.)
+        probability3 = data.get("sentence2", {}).get("probability", 0.)
+
         image_paths = data.get("image", [])
         if isinstance(image_paths, str):
             image_paths = [image_paths]
@@ -93,14 +99,37 @@ class HistoryView(QWidget):
 
         # Left: Text
         text_column = QVBoxLayout()
-        header = QLabel(f"Entry #{idx + 1}")
+        header = QLabel(f"Sentence #{idx + 1}")
         header.setStyleSheet("font-family: Times-Bold; font-size: 14pt; color: black;")
         text_column.addWidget(header)
 
-        sentence_label = QLabel("Most probable translation: "+sentence)
+        def format_sentence(sentence: str, probability: float) -> str:
+            return f"<b>{sentence}</b> <i><span style='font-size:8pt;'>(probability: {probability:.2f})</span></i>"
+
+        # Formatted sentence label
+        formatted_text = f"<b>{sentence1}</b> <i><span style='font-size:8pt;'>(probability: {probability1:.2f})</span></i>"
+        sentence_label = QLabel(formatted_text)
         sentence_label.setWordWrap(True)
-        sentence_label.setStyleSheet("font-family: 'Courier New'; font-size: 13pt; font-weight: bold; color: black;")
+        sentence_label.setTextFormat(Qt.TextFormat.RichText)
+        sentence_label.setStyleSheet("font-family: 'Courier New'; font-size: 13pt; color: black;")
         text_column.addWidget(sentence_label)
+
+        # Formatted sentence label
+        formatted_text = f"{sentence2} <i><span style='font-size:8pt;'>(probability: {probability2:.2f})</span></i>"
+        sentence_label = QLabel(formatted_text)
+        sentence_label.setWordWrap(True)
+        sentence_label.setTextFormat(Qt.TextFormat.RichText)
+        sentence_label.setStyleSheet("font-family: 'Courier New'; font-size: 13pt; color: black;")
+        text_column.addWidget(sentence_label)
+    
+        # Formatted sentence label
+        formatted_text = f"{sentence3} <i><span style='font-size:8pt;'>(probability: {probability3:.2f})</span></i>"
+        sentence_label = QLabel(formatted_text)
+        sentence_label.setWordWrap(True)
+        sentence_label.setTextFormat(Qt.TextFormat.RichText)
+        sentence_label.setStyleSheet("font-family: 'Courier New'; font-size: 13pt; color: black;")
+        text_column.addWidget(sentence_label)
+
 
         metadata_label = QLabel()
         metadata_label.setText(

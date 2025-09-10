@@ -224,7 +224,7 @@ class FormalReport:
             self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>danish</i>: {}'.format(prop["translations"]["danish"])
             self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
-            texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>arabic</i>: {}'.format(prop["translations"]["ar"])
+            texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>swedish</i>: {}'.format(prop["translations"]["swedish"])
             self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))
             texttrans = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;· <i>latin</i>: {}'.format(prop["translations"]["la"])
             self.story.append(KeepTogether(Paragraph(texttrans, self.styles['BulletText'])))

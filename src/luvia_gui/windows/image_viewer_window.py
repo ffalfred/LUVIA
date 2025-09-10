@@ -8,7 +8,8 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QPixmap
 from app_state import AppState
 
-
+from PIL import Image
+import os
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 from PyQt6.QtGui import QPixmap, QWheelEvent, QMouseEvent
 from PyQt6.QtCore import Qt
@@ -135,62 +136,129 @@ class ImageViewerWindow(QMainWindow):
             self.drag_start_position = event.pos()
 
 
+
 class ImageView(QWidget):
-    def __init__(self, image_path: str):
+    def __init__(self, reference_image_path: str, dynamic_image_path: str):
         super().__init__()
-        self.image_path = image_path
+        self.reference_image_path = reference_image_path
+        self.dynamic_image_path = dynamic_image_path
         self.last_modified = None
-        self.image_label = QLabel()
+
+        self.reference_label = QLabel()
+        self.dynamic_label = QLabel()
+
+        self.zoom_factor = 1.0
+
         self.init_ui()
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.check_for_update)
         self.timer.start(2000)  # Check every 2 seconds
 
+        self.dragging = False
+        self.drag_start_position = None
+
     def init_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        self.title = QLabel("Image Viewer")
+        self.title = QLabel("Image Comparison Viewer")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title.setStyleSheet("font-family: Times-Roman; font-size: 18pt; color: black;")
         layout.addWidget(self.title)
 
+
+        # Zoom buttons
+        button_layout = QHBoxLayout()
+        self.zoom_in_button = QPushButton("Zoom In")
+        self.zoom_out_button = QPushButton("Zoom Out")
+        self.zoom_in_button.clicked.connect(self.zoom_in)
+        self.zoom_out_button.clicked.connect(self.zoom_out)
+        button_layout.addWidget(self.zoom_in_button)
+        button_layout.addWidget(self.zoom_out_button)
+        layout.addLayout(button_layout)
+
+
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("background-color: black;")
-        self.image_label.setStyleSheet("background-color: black;")
         layout.addWidget(self.scroll_area)
 
         self.scroll_content = QWidget()
-        self.scroll_layout = QVBoxLayout()
+        self.scroll_layout = QHBoxLayout()  # Horizontal layout for side-by-side images
         self.scroll_content.setLayout(self.scroll_layout)
         self.scroll_area.setWidget(self.scroll_content)
 
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.scroll_layout.addWidget(self.image_label)
 
-        self.load_image()
+        self.scroll_area.setMouseTracking(True)
+        self.scroll_area.viewport().setMouseTracking(True)
 
-    def load_image(self):
-        if not os.path.exists(self.image_path):
-            self.image_label.setText(f"Image not found: {self.image_path}")
-            return
 
-        pixmap = QPixmap(self.image_path)
-        if pixmap.isNull():
-            self.image_label.setText("Failed to load image.")
+        self.reference_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.dynamic_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.reference_label.setStyleSheet("background-color: black;")
+        self.dynamic_label.setStyleSheet("background-color: black;")
+
+        self.scroll_layout.addWidget(self.reference_label)
+        self.scroll_layout.addWidget(self.dynamic_label)
+
+
+        self.load_images()
+
+
+    def zoom_in(self):
+        self.zoom_factor *= 1.2
+        self.load_images()
+
+    def zoom_out(self):
+        self.zoom_factor /= 1.2
+        self.load_images()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.drag_start_position = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            delta = event.pos() - self.drag_start_position
+            self.drag_start_position = event.pos()
+            self.scroll_area.horizontalScrollBar().setValue(
+                self.scroll_area.horizontalScrollBar().value() - delta.x()
+            )
+            self.scroll_area.verticalScrollBar().setValue(
+                self.scroll_area.verticalScrollBar().value() - delta.y()
+            )
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = False
+
+    def load_images(self):
+        # Load reference image
+        if os.path.exists(self.reference_image_path):
+            ref_pixmap = QPixmap(self.reference_image_path)
+            self.reference_label.setPixmap(ref_pixmap)
         else:
-            self.image_label.setPixmap(pixmap.scaledToWidth(800, Qt.TransformationMode.SmoothTransformation))
-            self.last_modified = os.path.getmtime(self.image_path)
+            self.reference_label.setText(f"Reference image not found: {self.reference_image_path}")
+
+        # Load dynamic image
+        if os.path.exists(self.dynamic_image_path):
+            dyn_pixmap = QPixmap(self.dynamic_image_path)
+            self.dynamic_label.setPixmap(dyn_pixmap)
+            self.last_modified = os.path.getmtime(self.dynamic_image_path)
+        else:
+            self.dynamic_label.setText(f"Dynamic image not found: {self.dynamic_image_path}")
 
     def check_for_update(self):
-        if not os.path.exists(self.image_path):
+        if not os.path.exists(self.dynamic_image_path):
             return
 
-        current_modified = os.path.getmtime(self.image_path)
+        current_modified = os.path.getmtime(self.dynamic_image_path)
         if self.last_modified is None or current_modified > self.last_modified:
-            self.load_image()
+            self.load_images()
 
     def stop_auto_refresh(self):
         self.timer.stop()
+
+

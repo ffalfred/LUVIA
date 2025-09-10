@@ -25,10 +25,10 @@ class LUVIA:
         else:
             ValueError("Mode {} not available".format(mode))
 
-        self.out_module = OutUtils(base_folder=out_folder, mode=mode)
         self.inverted_img = inverted_img
         self.number_proc = 0
         self.username = user
+        self.out_folder = out_folder
 
     def first_step(self, image_path, invert=False):
         image = ImageUtils.load_image(image_path=image_path)
@@ -147,6 +147,7 @@ class LUVIA:
                 clean_args=dict(), extract_images="cca", extract_lines_args=dict(),
                 extract_character_args=dict(), infer_model_args=dict(),
                 sentences_model_args=dict(), random_pick=False):
+        self.out_module = OutUtils(base_folder=self.out_folder, mode=self.mode, filename=os.path.basename(image_path))
         print("======================= ANALYZING STREET IMAGE =======================")
         self.image = self.first_step(image_path=image_path, invert=self.inverted_img)
 
@@ -232,6 +233,7 @@ class LUVIA:
     def horde(self, folder_streets, clean_args=dict(), extract_lines_args=dict(),
                 extract_character_args=dict(), infer_model_args=dict(), sentences_model_args=dict(), 
                 limit_loops=False, max_runs=10):
+        self.out_module = OutUtils(base_folder=self.out_folder, mode=self.mode, filename="LOOP")
         dict_files = self._getstreets(folder_streets=folder_streets)
         loop_active = True
         count_runs = 0
@@ -261,7 +263,15 @@ class LUVIA:
                         "{}/images/image-transformation.jpg".format(self.out_module.output_folder))
             runs_folder.append(out_folder)
             sentence_num = 0
-            entry ={"sentence": sentences[0][0]["sentence"],
+            entry ={"sentence0": {
+                        "sentence": sentences[0][0]["sentence"],
+                        "probability":float(sentences[0][0]["probability"])},
+                    "sentence1": {
+                        "sentence": sentences[0][1]["sentence"],
+                        "probability":float(sentences[0][1]["probability"])},
+                    "sentence2": {
+                        "sentence": sentences[0][2]["sentence"],
+                        "probability":float(sentences[0][2]["probability"])},                          
                     "location": "{}--56,24".format(file_key),
                     "image": ["{}/images/line_images/_image_line-{}.jpg".format(out_folder, sentence_num),
                               "{}/images/3_contours.jpg".format(out_folder, sentence_num)],
@@ -323,7 +333,8 @@ def main():
                 infer_model_args=LUVIAargs.extract_group_args(largs, "straw"),
                 sentences_model_args=LUVIAargs.extract_group_args(largs, "tongue"),
                 limit_loops=False)
-            
+    print("======================= LUVIA RUN SUCCESSFULLY =======================")
+    print("======================================================================")
 if __name__== "__main__":
     main()
     

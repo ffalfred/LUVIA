@@ -230,8 +230,11 @@ class MainControlWindow(QMainWindow):
 
     def check_for_image_file(self, image_path):
         elapsed = time.time() - self.image_check_start_time
+        current_file_folder = os.path.dirname(os.path.abspath(__file__))
+        reference_path = os.path.abspath("{}/../data/2023_84_40_2_0143_00113914_small.jpeg".format(current_file_folder))
         if os.path.isfile(image_path):
-            self.image_viewer_window = ImageView(image_path)
+            self.image_viewer_window = ImageView(dynamic_image_path=image_path,
+                                                    reference_image_path=reference_path)
             screens = QApplication.screens()
             preferred_screen_index = 2
             if preferred_screen_index < len(screens):
