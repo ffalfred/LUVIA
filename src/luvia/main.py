@@ -46,6 +46,7 @@ class LUVIA:
             cleaned_image = Eyes_OTSU_Clean.extract_shorthand_strokes(image=image,
                                                                         **clean_args)
         self.number_proc += 1
+        cleaned_image = ImageUtils.add_canvas(image=cleaned_image)
         self.out_module.save_image(cleaned_image, prefix=str(self.number_proc), 
                                     suffix="cleaned", inverse=True, angle=-90, general=True)
         return cleaned_image
@@ -177,6 +178,7 @@ class LUVIA:
         sentences_demo = []
         if random_pick:
             random.shuffle(lines)
+        character_chosen = ""
         print("======================= TRANSLATING SMEDT SHORTHAND SENTENCES =======================")
         for line_count, line in tqdm(enumerate(lines)):
             print("======================= TRANSLATING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
@@ -279,7 +281,7 @@ class LUVIA:
                     "id": os.path.basename(out_folder)
                     }
             self._write_jsonfile(json_path=json_path, new_entry=entry)
-            if len(runs_folder) >=max_runs:
+            if False and len(runs_folder) >=max_runs:
                 fold_del = runs_folder.pop(0)
                 if os.path.exists(fold_del):
                     try:

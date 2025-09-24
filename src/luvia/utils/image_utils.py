@@ -6,6 +6,31 @@ class ImageUtils:
     @staticmethod
     def load_image(image_path):
         return cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    
+    @staticmethod
+    def reduce_quality(image, new_width=350):
+        # Calculate the new height to maintain aspect ratio
+        height, width = image.shape[:2]
+        aspect_ratio = height / width
+        new_height = int(new_width * aspect_ratio)
+
+        # Resize the image
+        resized_img = cv2.resize(image, (new_width, new_height))
+        print(resized_img)
+        return resized_img
+    
+    @staticmethod
+    def add_canvas(image, canvas_size=300):
+        canvas_height = image.shape[0] + canvas_size
+        canvas_width = image.shape[1] + canvas_size
+        # Create a white canvas
+        white_canvas = np.ones((canvas_height, canvas_width), dtype=np.uint8) * 255
+        # Compute top-left corner to center the image
+        y_offset = (canvas_height - image.shape[0]) // 2
+        x_offset = (canvas_width - image.shape[1]) // 2
+        # Paste the image onto the canvas
+        white_canvas[y_offset:y_offset+image.shape[0], x_offset:x_offset+image.shape[1]] = image
+        return white_canvas
 
     @staticmethod
     def rotate_image(image, angle):

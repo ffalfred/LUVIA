@@ -2,13 +2,46 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QHBoxLayout
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QPushButton, QFileDialog
+from PyQt6.QtGui import QPdfWriter, QPainter, QFont, QPixmap
+from PyQt6.QtCore import QRectF, QRect
+
+from PyQt6.QtGui import QPageSize, QTextDocument
+
+from PyQt6.QtWidgets import QFileDialog
+
+
+
+from PyQt6.QtCore import QRect, QSize, Qt
+from PyQt6.QtGui import QPainter, QPixmap
+from PyQt6.QtGui import QPageSize
+
+from PyQt6.QtWidgets import QWidget
+
+from PyQt6.QtGui import QPdfWriter, QPainter, QPixmap
+from PyQt6.QtCore import QRect, QSize, Qt, QSizeF
+from PyQt6.QtGui import QPageSize
+
+import math
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
+
+from PyQt6.QtWidgets import QFileDialog
+
+from PyQt6.QtPrintSupport import QPrinter
+
+
 import json
 import os
 
 class HistoryView(QWidget):
-    def __init__(self, jsonl_path: str):
+    def __init__(self, jsonl_path: str, terminal=None):
         super().__init__()
         self.jsonl_path = jsonl_path
+        self.terminal = terminal
         self.init_ui()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.load_jsonl)
@@ -18,6 +51,10 @@ class HistoryView(QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
+
+        self.download_button = QPushButton("Download PDF")
+        self.download_button.clicked.connect(self.export_to_pdf)
+        layout.addWidget(self.download_button)
 
         self.title = QLabel("Loop History Report")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -60,7 +97,8 @@ class HistoryView(QWidget):
             QTimer.singleShot(0, lambda: scroll_bar.setValue(scroll_bar.maximum()))
 
         except Exception as e:
-            self.title.setText(f"Error loading history: {str(e)}")
+            if self.terminal is not None:
+                self.terminal.output.append(f"[HistoryView] Error loading history: {str(e)}")
 
     def create_divider_line(self, color, height=4):
         line = QFrame()
@@ -160,3 +198,81 @@ class HistoryView(QWidget):
 
         container.setLayout(container_layout)
         return container
+    
+
+
+    def export_to_pdf_high_quality(self, jsonl_path, pdf_writer, terminal=None):
+        doc = QTextDocument()
+        html = "<h2>Loop History Report</h2>"
+
+        try:
+            with open(jsonl_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except Exception as e:
+            if terminal:
+                terminal.output.append(f"[PDF Export] Error reading file: {str(e)}")
+            return
+
+        for line in lines:
+            try:
+                data = json.loads(line)
+                html += f"""
+                <p><b>Sentence 1:</b> {data.get('sentence0', {}).get('sentence', '')} 
+                <i>(probability: {data.get('sentence0', {}).get('probability', 0.):.2f})</i></p>
+                <p><b>Sentence 2:</b> {data.get('sentence1', {}).get('sentence', '')} 
+                <i>(probability: {data.get('sentence1', {}).get('probability', 0.):.2f})</i></p>
+                <p><b>Sentence 3:</b> {data.get('sentence2', {}).get('sentence', '')} 
+                <i>(probability: {data.get('sentence2', {}).get('probability', 0.):.2f})</i></p>
+                <p><b>Location:</b> {data.get('location', '')}<br>
+                <b>Time:</b> {data.get('time', '')}<br>
+                <b>ID:</b> {data.get('id', '')}</p>
+                <hr>
+                """
+            except json.JSONDecodeError:
+                continue
+
+        doc.setHtml(html)
+        doc.print(pdf_writer)
+
+        if terminal:
+            terminal.output.append("[PDF Export] High-quality PDF export completed.")
+
+    def export_to_pdf(self):
+
+
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save PDF", "", "PDF Files (*.pdf)")
+        if not file_path:
+            return
+
+        scale_factor = 3
+        original_size = self.scroll_content.size()
+        high_res_width = original_size.width() * scale_factor
+        high_res_height = original_size.height() * scale_factor
+
+        # Render the scroll_content to a high-resolution image
+        full_image = QPixmap(high_res_width, high_res_height)
+        full_image.fill(Qt.GlobalColor.white)
+
+        painter = QPainter(full_image)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.scale(scale_factor, scale_factor)
+        self.scroll_content.render(painter)
+        painter.end()
+
+        # Determine the actual content width by checking the rightmost edge of all direct child widgets
+        entry_widgets = [w for w in self.scroll_content.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)]
+        max_right_edge = max((w.x() + w.width()) * scale_factor for w in entry_widgets) if entry_widgets else high_res_width
+
+        # Set the page size tightly to the content width and full height
+        content_size = QSizeF(int(max_right_edge/4), int(high_res_height/2))
+        pdf_writer = QPdfWriter(file_path)
+        pdf_writer.setResolution(900)
+        pdf_writer.setPageSize(QPageSize(content_size, QPageSize.Unit.Point))
+
+        # Write the image to the PDF
+        pdf_painter = QPainter(pdf_writer)
+        pdf_painter.drawPixmap(0, 0, full_image)
+        pdf_painter.end()
+
+        if self.terminal:
+            self.terminal.output.append("[PDF Export] PDF saved with tight content width and no entry cuts.")

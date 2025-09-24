@@ -216,7 +216,7 @@ class MainControlWindow(QMainWindow):
     def check_for_history_file(self, history_path):
         elapsed = time.time() - self.history_check_start_time
         if os.path.isfile(history_path):
-            self.json_viewer_window = HistoryView(history_path)
+            self.json_viewer_window = HistoryView(history_path, terminal=self.terminal)
             screens = QApplication.screens()
             preferred_screen_index = 2
             if preferred_screen_index < len(screens):
