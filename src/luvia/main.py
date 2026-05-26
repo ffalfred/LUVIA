@@ -305,7 +305,7 @@ def main():
     if largs.clean_mode == "simple":
         clean_args = LUVIAargs.extract_group_args(largs, "clean_simple")
     elif largs.clean_mode == "OTSA":
-        clean_args = LUVIAargs.extract_group_args(largs, "clean_OTSA")
+        clean_args = LUVIAargs.extract_group_args(largs, "clean_otsa")
     else:
         clean_args = False 
     if largs.hoofh_mode == "cca":
