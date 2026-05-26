@@ -1,2 +1,0 @@
-luvia
-luvia_gui

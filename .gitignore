@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Large source assets that don't belong in git
+# (use git-lfs or external storage instead)
+*.tif
+*.tiff
+
+# Local outputs
+out/
+output/
+outputs/
+runs/
+*.log
+command_log.txt
+
+# Jupyter
+.ipynb_checkpoints/
