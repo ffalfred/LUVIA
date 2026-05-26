@@ -20,10 +20,10 @@ class LUVIA:
     def __init__(self, inverted_img, out_folder, user, mode="main"):
         if mode in ["main", "tongue", "hoof", "straw", "horde"]:
             self.mode = mode
-            if mode != "main" or mode != "horde":
-                ValueError("Not yet implemented!!!")
+            if mode != "main" and mode != "horde":
+                raise ValueError("Not yet implemented!!!")
         else:
-            ValueError("Mode {} not available".format(mode))
+            raise ValueError("Mode {} not available".format(mode))
 
         self.inverted_img = inverted_img
         self.number_proc = 0
@@ -73,7 +73,7 @@ class LUVIA:
         elif extract_sentences == "threshold":
             image_contours, lines = Hoof_HThresh.extract_lines(image_rotated, **extract_lines_args)
         else:
-            ValueError("That option is not available")
+            raise ValueError("That option is not available")
         self.number_proc += 1
         self.out_module.save_image(image_contours, prefix=str(self.number_proc),
                                 suffix="contours", inverse=True)
