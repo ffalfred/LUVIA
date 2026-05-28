@@ -40,22 +40,22 @@ class LUVIAargs():
         clean = parser.add_argument_group("Clean Image Settings")      
         clean.add_argument("--blur_kernel", default="5,5")
         clean.add_argument("--blur_sigma", default=0, type=float)
-        clean.add_argument("--block_size", default=15, type=float)
+        clean.add_argument("--block_size", default=15, type=int)
         clean.add_argument("--vthresh_C", default=3, type=float)
         clean.add_argument("--min_area", default=20, type=float)
         clean.add_argument("--max_area", default=2000, type=float)
         clean.add_argument("--min_aspect", default=0.1, type=float)
         clean.add_argument("--max_aspect", default=10.0, type=float)
-        clean.add_argument("--min_vertices", default=6, type=float)
+        clean.add_argument("--min_vertices", default=6, type=int)
 
-        clean.add_argument("--blur_kernel_size", default=5, type=float)
+        clean.add_argument("--blur_kernel_size", default=5, type=int)
         clean.add_argument("--canny_thresh1", default=50, type=float)
         clean.add_argument("--canny_thresh2", default=150, type=float)
         clean.add_argument("--cc_min_area", default=20, type=float)
         clean.add_argument("--cc_max_area", default=2000, type=float)
         clean.add_argument("--contour_min_area", default=20, type=float)
         clean.add_argument("--contour_max_area", default=2000, type=float)
-        clean.add_argument("--contour_min_vertices", default=5, type=float)
+        clean.add_argument("--contour_min_vertices", default=5, type=int)
         clean.add_argument("--contour_max_vertices", default=0.001, type=float)    
 
     @staticmethod
@@ -68,7 +68,7 @@ class LUVIAargs():
         hoofv.add_argument("--angle_tolerance", default=15, type=float)
         hoofv.add_argument("--filter_boxes", default="inside_box")
         hoofv.add_argument("--kernel_size", default="150,20")
-        hoofv.add_argument("--iterations", default=1, type=float)
+        hoofv.add_argument("--iterations", default=1, type=int)
 
 
 
