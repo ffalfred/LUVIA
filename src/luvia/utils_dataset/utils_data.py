@@ -14,11 +14,18 @@ from itertools import chain
 from nltk.corpus import wordnet as wn
 from nltk.corpus import brown
 
-# Download required resources
-nltk.download('wordnet')
-nltk.download('brown')
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger_eng')
+
+def _ensure_nltk_data():
+    """Download required NLTK corpora only if missing (no network on import)."""
+    for find_path, name in [("corpora/wordnet", "wordnet"),
+                            ("corpora/brown", "brown"),
+                            ("tokenizers/punkt", "punkt"),
+                            ("taggers/averaged_perceptron_tagger_eng",
+                             "averaged_perceptron_tagger_eng")]:
+        try:
+            nltk.data.find(find_path)
+        except LookupError:
+            nltk.download(name, quiet=True)
 
 
 
@@ -26,6 +33,7 @@ class PolishDB():
 
     def __init__(self, brown_to_gen, pos_tags, freqs_tags):
 
+        _ensure_nltk_data()
         self.pos_tags = pd.read_csv(pos_tags, sep="\t")
         self.freqs_tags = pd.read_csv(freqs_tags, sep="\t")
         self.postags_dict = PolishDB.build_brown_pos_dict()

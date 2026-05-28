@@ -15,8 +15,14 @@ import ety
 import string
 import math
 
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+def _ensure_nltk_data():
+    """Download required NLTK corpora only if missing (no network on import)."""
+    for find_path, name in [("corpora/wordnet", "wordnet"),
+                            ("corpora/omw-1.4", "omw-1.4")]:
+        try:
+            nltk.data.find(find_path)
+        except LookupError:
+            nltk.download(name, quiet=True)
 
 #from gramformer import Gramformer
 from luvia.tongue.distance import DictMatch
@@ -30,6 +36,8 @@ from deep_translator import GoogleTranslator
 class Tongue:
 
     def __init__(self, db_words=False, match_mode=False, character="random"):
+
+        _ensure_nltk_data()
 
         # Load spaCy model
         self.nlp = spacy.load("en_core_web_sm")
