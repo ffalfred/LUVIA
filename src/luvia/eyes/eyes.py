@@ -178,7 +178,10 @@ class Eyes_OTSU_Clean:
                                 canny_thresh1=50, canny_thresh2=150,
                                 cc_min_area=20, cc_max_area=2000,
                                 contour_min_area=20, contour_max_area=2000,
-                                contour_min_vertices=5, hu_moment_threshold=0.001):
+                                contour_min_vertices=5, contour_max_vertices=0.001):
+        # NB: `contour_max_vertices` is the CLI name for what is actually a
+        # Hu-moment shape-complexity threshold (lower = accept rounder shapes).
+        # Kept under this name for CLI compatibility; rename together later.
         blurred = Eyes_OTSU_Clean.apply_median_blur(image, blur_kernel_size)
         otsu_thresh = Eyes_OTSU_Clean.apply_otsu_threshold(blurred)
         edges = Eyes_OTSU_Clean.apply_canny_edge_detection(blurred, canny_thresh1, canny_thresh2)
@@ -186,7 +189,7 @@ class Eyes_OTSU_Clean:
         contours, _ = cv2.findContours(cc_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         final_mask = Eyes_OTSU_Clean.filter_contours_by_shape(image, contours,
                                             contour_min_area, contour_max_area,
-                                            contour_min_vertices, hu_moment_threshold)
+                                            contour_min_vertices, contour_max_vertices)
         result = Eyes_OTSU_Clean.apply_mask_to_image(image, final_mask)
         return result
 
