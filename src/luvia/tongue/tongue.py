@@ -76,7 +76,7 @@ class Tongue:
             if match_mode == "character_POS":
                 self.character_features, self.character = Tongue.load_character(character)
             else:
-                self.character_features, self.character = None
+                self.character_features, self.character = None, ""
         else:
             self.dictmatch_module = None
         self.match_mode = match_mode
