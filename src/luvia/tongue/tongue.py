@@ -33,18 +33,44 @@ from deepmultilingualpunctuation import PunctuationModel
 from deep_translator import GoogleTranslator
 
 
+# Heavy models are cached at module scope so they load once per process and
+# are reused across every Tongue() instance (the horde loop creates a new
+# Tongue per image) and every correct() call.
+_MODEL_CACHE = {}
+_GRAMMAR_MODEL_NAME = "prithivida/grammar_error_correcter_v1"
+
+
+def _get_spacy():
+    if "spacy" not in _MODEL_CACHE:
+        _MODEL_CACHE["spacy"] = spacy.load("en_core_web_sm")
+    return _MODEL_CACHE["spacy"]
+
+
+def _get_gpt2():
+    if "gpt2_model" not in _MODEL_CACHE:
+        _MODEL_CACHE["gpt2_tokenizer"] = GPT2TokenizerFast.from_pretrained("gpt2")
+        _MODEL_CACHE["gpt2_model"] = GPT2LMHeadModel.from_pretrained("gpt2")
+    return _MODEL_CACHE["gpt2_tokenizer"], _MODEL_CACHE["gpt2_model"]
+
+
+def _get_grammar_corrector():
+    if "grammar_model" not in _MODEL_CACHE:
+        _MODEL_CACHE["grammar_tokenizer"] = AutoTokenizer.from_pretrained(_GRAMMAR_MODEL_NAME)
+        _MODEL_CACHE["grammar_model"] = AutoModelForSeq2SeqLM.from_pretrained(_GRAMMAR_MODEL_NAME)
+    return _MODEL_CACHE["grammar_tokenizer"], _MODEL_CACHE["grammar_model"]
+
+
 class Tongue:
 
     def __init__(self, db_words=False, match_mode=False, character="random"):
 
         _ensure_nltk_data()
 
-        # Load spaCy model
-        self.nlp = spacy.load("en_core_web_sm")
+        # Load spaCy model (cached at module scope)
+        self.nlp = _get_spacy()
 
-        # Load GPT-2 model and tokenizer
-        self.tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-        self.model = GPT2LMHeadModel.from_pretrained("gpt2")
+        # Load GPT-2 model and tokenizer (cached at module scope)
+        self.tokenizer, self.model = _get_gpt2()
         if match_mode:
             self.dictmatch_module = DictMatch(db_words=db_words)
             if match_mode == "character_POS":
@@ -287,10 +313,8 @@ class Tongue:
 
 
     def correct(self, sentences, correct_k):
-        # Load model and tokenizer
-        model_name = "prithivida/grammar_error_correcter_v1"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        # Model + tokenizer cached at module scope (loaded once per process)
+        tokenizer, model = _get_grammar_corrector()
         corrected_batch = []
         for sentence in sentences:
             input_text = f"gec: {sentence}"
