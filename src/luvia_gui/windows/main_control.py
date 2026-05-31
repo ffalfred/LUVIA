@@ -7,10 +7,9 @@ from luvia_gui.components.terminal_panel import Terminal
 from luvia_gui.components.output_browser import OutputBrowser
 from luvia_gui.components.file_tree import FileTree
 from luvia_gui.windows.pdf_viewer_window import PDFViewerWindow
-from luvia_gui.windows.image_viewer_window import ImageViewerWindow, ImageView
-from luvia_gui.backend.command_management import CommandManager
+from luvia_gui.windows.image_viewer_window import ImageViewerWindow
+from luvia_gui.backend.pipeline_worker import PipelineRunner
 from luvia_gui.components.loop_mode_view import LoopModeView
-from luvia_gui.windows.json_viewer_window import HistoryView
 from app_state import AppState
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSizePolicy
@@ -20,7 +19,6 @@ from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
-import time
 from luvia_gui.windows.pdf_image_combined_window import PDFImageCombinedWindow
 
 
@@ -122,11 +120,13 @@ class MainControlWindow(QMainWindow):
         self.app_state.mode_changed.connect(self.on_mode_changed)
         self.app_state.input_folder_changed.connect(self.input_panel.select_input_folder)
         self.app_state.output_folder_changed.connect(self.input_panel.select_output_folder)
+        # Bridge InputPanel output-folder selection into AppState so
+        # WindowManager (and anyone else listening) is notified.
+        self.input_panel.output_folder_changed.connect(self.app_state.set_output_folder)
 
         # Run button connection
         self.input_panel.run_button.clicked.connect(self.run_clicked)
 
-        self.json_viewer_window = None
         self.backend_worker = None
 
         self.stop_loop_button = QPushButton("Stop")
@@ -160,19 +160,11 @@ class MainControlWindow(QMainWindow):
         self.pdf_image_combined_window = PDFImageCombinedWindow(app_state)
         self.open_combined_view_button = QPushButton("Open PDF + Image Viewer")
         self.open_combined_view_button.clicked.connect(self.open_combined_view)
-        # Add next to Run button
-        self.input_panel.layout().addWidget(self.stop_loop_button)
 
-        self.history_check_timer = None
-        self.history_check_start_time = None
-
-        self.command_manager = CommandManager(
-            terminal=self.terminal,
-            button=self.input_panel.run_button,
-            spinner=None,
-            stop_button=self.stop_button  # new
-        )
-        self.command_manager.command_finished_callback = self.on_command_finished
+        self.pipeline_runner = PipelineRunner(self)
+        self.pipeline_runner.output_line.connect(self.terminal.output.append)
+        self.pipeline_runner.event.connect(self._on_pipeline_event)
+        self.pipeline_runner.finished.connect(self._on_pipeline_finished)
 
 
     def update_spinner_pixmap(self):
@@ -184,9 +176,22 @@ class MainControlWindow(QMainWindow):
         self.spinner_label.setPixmap(scaled_pixmap)
 
 
-    def on_command_finished(self):
+    def _on_pipeline_event(self, name, payload):
+        # Stage events from the LUVIA pipeline. Richer UI (per-stage progress,
+        # live thumbnails, etc.) can subscribe here. The pipeline's own banner
+        # prints already stream into the terminal via output_line.
+        pass
+
+    def _on_pipeline_finished(self, status, payload):
+        self.input_panel.run_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
         self.spinner_timer.stop()
         self.update_spinner_pixmap()
+        if status == "cancelled":
+            self.terminal.output.append("Pipeline cancelled.")
+        elif status == "error":
+            self.terminal.output.append("Pipeline error: {} {}".format(
+                payload.get("type", ""), payload.get("message", "")))
 
     def rotate_spinner(self):
         transform = QTransform().rotate(self.rotation_angle)
@@ -212,39 +217,6 @@ class MainControlWindow(QMainWindow):
 
         self.show_combined_pdf_image_viewer(pdf_path, image_path)
 
-
-    def check_for_history_file(self, history_path):
-        elapsed = time.time() - self.history_check_start_time
-        if os.path.isfile(history_path):
-            self.json_viewer_window = HistoryView(history_path, terminal=self.terminal)
-            screens = QApplication.screens()
-            preferred_screen_index = 2
-            if preferred_screen_index < len(screens):
-                self.json_viewer_window.move(screens[preferred_screen_index].geometry().topLeft())
-            self.json_viewer_window.show()
-            self.history_check_timer.stop()
-            self.terminal.output.append("History viewer launched.")
-        elif elapsed > 600:  # 10 minutes
-            self.history_check_timer.stop()
-            self.terminal.output.append("Timeout: History file not found after 10 minutes.")
-
-    def check_for_image_file(self, image_path):
-        elapsed = time.time() - self.image_check_start_time
-        current_file_folder = os.path.dirname(os.path.abspath(__file__))
-        reference_path = os.path.abspath("{}/../data/2023_84_40_2_0143_00113914_small.jpeg".format(current_file_folder))
-        if os.path.isfile(image_path):
-            self.image_viewer_window = ImageView(dynamic_image_path=image_path,
-                                                    reference_image_path=reference_path)
-            screens = QApplication.screens()
-            preferred_screen_index = 2
-            if preferred_screen_index < len(screens):
-                self.image_viewer_window.move(screens[preferred_screen_index].geometry().topLeft())
-            self.image_viewer_window.show()
-            self.image_check_timer.stop()
-            self.terminal.output.append("Image viewer launched.")
-        elif elapsed > 600:  # 10 minutes
-            self.image_check_timer.stop()
-            self.terminal.output.append("Timeout: Image file not found after 10 minutes.")
 
     def open_combined_view(self):
         output_folder = self.input_panel.output_folder_field.text()
@@ -283,42 +255,28 @@ class MainControlWindow(QMainWindow):
         self.pdf_image_combined_window.show()
 
     def stop_command(self):
-        self.spinner_timer.stop()
-        self.update_spinner_pixmap()
-        self.command_manager.stop_command()
-        self.terminal.output.append("Command stopped.")
+        self.pipeline_runner.cancel()
+        self.terminal.output.append("Cancellation requested; will stop at the next stage boundary.")
 
 
     def run_clicked(self):
-        command = self.input_panel.build_command()
-        if not command:
-            return  # Error already shown in InputPanel
+        argv = self.input_panel.build_argv()
+        if not argv:
+            return  # validation message already shown by InputPanel
 
-        self.terminal.output.append(f"Running command: {command}")
+        self.terminal.output.append("Running luvia " + " ".join(argv))
+        self.input_panel.run_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
         self.spinner_timer.start()
+        if not self.pipeline_runner.start(argv):
+            self.terminal.output.append("Pipeline already running.")
+            self.input_panel.run_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+            self.spinner_timer.stop()
+            return
 
-        if self.app_state.get_mode() == "loop":
-            input_folder = self.input_panel.input_folder_field.text()
-            output_folder = self.input_panel.output_folder_field.text()
-            history_path = os.path.join(output_folder, "LUVIA_history.jsonl")
-            image_path = os.path.join(output_folder, "images/image-transformation.jpg") 
-            self.app_state.history_path = history_path
-            self.app_state.output_folder = output_folder
-            self.command_manager.execute_command(command)
-
-            self.history_check_start_time = time.time()
-            self.history_check_timer = QTimer(self)
-            self.history_check_timer.timeout.connect(lambda: self.check_for_history_file(history_path))
-            self.history_check_timer.start(2000)  # Check every 2 seconds
-
-            self.image_check_start_time = time.time()
-            self.image_check_timer = QTimer(self)
-            self.image_check_timer.timeout.connect(lambda: self.check_for_image_file(image_path))
-            self.image_check_timer.start(2000)  # Check every 2 seconds
-
-        else:
-            self.command_manager.execute_command(command)
-
+        # Aux windows for loop mode are owned by WindowManager, which reacts
+        # to app_state mode/output-folder changes.
         output_folder = self.input_panel.output_folder_field.text()
         if os.path.isdir(output_folder):
             self.file_tree_main.set_root(output_folder)

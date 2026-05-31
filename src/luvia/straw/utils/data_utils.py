@@ -4,6 +4,7 @@ import os
 
 from skimage.transform import resize
 import skimage.io as img_io
+import skimage.color as img_color
 
 import torch
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -215,7 +216,7 @@ class Shorthand_Dataset(Dataset):
         # geometric augmentation
         if geometric:
             geom_c = A.Affine(rotate=(-1, 1), shear={'x':(-30, 30), 'y' : (-5, 5)}, scale=(0.6, 1.2),
-                                translate_percent=0.02, mode=1, p=0.5)
+                                translate_percent=0.02, p=0.5)
             aug_lst.append(geom_c)
         # perspective transform
         if perspective:
@@ -224,7 +225,7 @@ class Shorthand_Dataset(Dataset):
         # distortions
         if distortions:
             dist_c = A.OneOf([A.GridDistortion(distort_limit=(-.1, .1), p=0.5),
-                                A.ElasticTransform(alpha=60, sigma=20, alpha_affine=0.5, p=0.5),], p=0.5)
+                                A.ElasticTransform(alpha=60, sigma=20, p=0.5),], p=0.5)
             aug_lst.append(dist_c)
         # erosion & dilation
         if erosion:

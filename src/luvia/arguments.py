@@ -136,7 +136,9 @@ class LUVIAargs():
         return arguments_parse
 
     @staticmethod
-    def main():
+    def main(argv=None):
+        # argv=None preserves CLI behavior (reads sys.argv); passing a list lets
+        # the GUI (PipelineWorker) drive the same parser programmatically.
         parser = argparse.ArgumentParser(description="Luvia animal",
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -176,7 +178,7 @@ class LUVIAargs():
         LUVIAargs.straw_args(horde_parser)
         LUVIAargs.tongue_args(horde_parser)
 
-        arguments_parse = parser.parse_args()
+        arguments_parse = parser.parse_args(argv)
         arguments_parse = LUVIAargs.fix_args(arguments_parse)
         return arguments_parse
 

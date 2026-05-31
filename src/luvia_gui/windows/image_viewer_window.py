@@ -87,7 +87,7 @@ class ImageViewerWindow(QMainWindow):
     def update_image_display(self):
         pixmap = QPixmap(self.current_image_path)
         if not pixmap.isNull():
-            scroll_area_size = self.scroll_area.viewport().size()
+            scroll_area_size = self.scroll_area.viewport().size() * self.zoom_factor
             scaled_pixmap = pixmap.scaled(
                 scroll_area_size,
                 Qt.AspectRatioMode.KeepAspectRatio,

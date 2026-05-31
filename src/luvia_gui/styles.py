@@ -36,5 +36,5 @@ def apply_dark_theme_main(app: QApplication):
     palette.setColor(QPalette.ColorRole.ButtonText, QColor(OFF_WHITE))
     palette.setColor(QPalette.ColorRole.BrightText, QColor(GOLDEN))
     
-    #app.setStyle("Fusion")
-    #app.setPalette(palette)
+    app.setStyle("Fusion")
+    app.setPalette(palette)

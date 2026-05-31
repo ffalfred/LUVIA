@@ -95,7 +95,13 @@ class OutUtils:
         # Bottom projection plot
         ax2.plot(projection, label="Smoothed Projection", color="blue")
         if len(minima) > 0:
-            minima_flatten = [item for tup in minima for item in tup]
+            # minima may be a flat sequence of ints (argrelextrema output) or
+            # a list of (start, end) tuples (refine_consecutive_minima output);
+            # handle both rather than assuming tuples.
+            if hasattr(minima[0], "__iter__"):
+                minima_flatten = [item for tup in minima for item in tup]
+            else:
+                minima_flatten = list(minima)
             ax2.scatter(minima_flatten, [int(projection[i]) for i in minima_flatten], color="red", label="Local Minima")
         if len(maxima) > 0:
             #maxima_flatten = [item for tup in maxima for item in tup]
@@ -144,7 +150,7 @@ class OutUtils:
             plt.close()
         else:
             # Save vanilla
-            cv2.imwrite(img_path, image, dpi=300)
+            cv2.imwrite(img_path, image)
         
     
     def plot_feature_maps(self, activation, prefix, suffix, num_maps=9):

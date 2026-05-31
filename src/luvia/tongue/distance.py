@@ -24,12 +24,12 @@ class DictMatch:
         if os.path.isfile(db_words):
             df_words = pd.read_csv(db_words, sep="\t", dtype={"word": str})
             df_words.loc[df_words["word"].isna(), "word"] = "None"
-            valid_words.extend(df_words["word"].tolist())
+            valid_words = df_words
         elif os.path.isdir(db_words):
             words_lst = []
             for filename in os.listdir(db_words):
                 words_lst.append(filename.replace(".png", ""))
-            valid_words = pd.DataFrame(words_lst)
+            valid_words = pd.DataFrame(words_lst, columns=["word"])
         elif not db_words:
             current_directory = os.path.dirname(os.path.abspath(__file__))
             filedf = Path(current_directory) / '../data/greggs_metadata.tsv'
@@ -37,7 +37,7 @@ class DictMatch:
             df_words.loc[df_words["word"].isna(), "word"] = "None"
             valid_words = df_words
         elif isinstance(db_words, list):
-            valid_words = pd.DataFrame(db_words)
+            valid_words = pd.DataFrame(db_words, columns=["word"])
         else:
             raise ValueError("DB_words is not valid")
         return valid_words

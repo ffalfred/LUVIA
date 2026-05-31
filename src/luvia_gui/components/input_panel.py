@@ -209,3 +209,44 @@ class InputPanel(QWidget):
                 QMessageBox.warning(self, "Missing Output Folder", "Please select a valid output folder.")
                 return ""
         return command
+
+    def build_argv(self):
+        """Return a list of CLI tokens (no shell-quoting) for in-process use
+        by PipelineWorker, or None if required fields are missing. Mirrors
+        build_command but without the subprocess-style quoting."""
+        argv = []
+        if self.input_file_field.isVisible():  # Main mode
+            input_file = self.input_file_field.text()
+            output_folder = self.output_folder_field.text()
+            if not (input_file and os.path.isfile(input_file)):
+                QMessageBox.warning(self, "Missing Input File", "Please select a valid input file.")
+                return None
+            if not (output_folder and os.path.isdir(output_folder)):
+                QMessageBox.warning(self, "Missing Output Folder", "Please select a valid output folder.")
+                return None
+            argv.extend(["--input", input_file, "--output", output_folder])
+            for flag, widget in self.inputs.items():
+                if isinstance(widget, QCheckBox):
+                    if widget.isChecked():
+                        argv.append(flag)
+                    continue
+                if isinstance(widget, QLineEdit):
+                    value = widget.text()
+                elif isinstance(widget, QComboBox):
+                    value = widget.currentText()
+                else:
+                    continue
+                if value != "" and value is not None:
+                    argv.extend([flag, str(value)])
+            return ["main"] + argv
+
+        # Loop mode
+        input_folder = self.input_folder_field.text()
+        output_folder = self.output_folder_field.text()
+        if not (input_folder and os.path.isdir(input_folder)):
+            QMessageBox.warning(self, "Missing Input Folder", "Please select a valid input folder.")
+            return None
+        if not (output_folder and os.path.isdir(output_folder)):
+            QMessageBox.warning(self, "Missing Output Folder", "Please select a valid output folder.")
+            return None
+        return ["horde", "--folder_streets", input_folder, "--output", output_folder]

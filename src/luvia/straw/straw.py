@@ -24,8 +24,13 @@ class Straw:
                     'w': 25, 'x': 26, 'y': 27, 'z': 28}
     maxlen_word = 21
 
+    _weights_dir = "{}/../data/weights".format(os.path.dirname(os.path.abspath(__file__)))
     weights_model = {
-        "speak": "{}/../data/weights/weights2_speakcorpus_e60.pt".format(os.path.dirname(os.path.abspath(__file__)))
+        "speak": "{}/weights2_speakcorpus_e60.pt".format(_weights_dir),
+        "all": "{}/weights_allcorpus_e60.pt".format(_weights_dir),
+        "conversation": "{}/weights_conversationcorpus_e60.pt".format(_weights_dir),
+        "imaginative": "{}/weights_imaginativecorpus_e60.pt".format(_weights_dir),
+        "informative": "{}/weights_informativecorpus_e60.pt".format(_weights_dir),
         }
 
 
@@ -111,38 +116,6 @@ class Straw:
         gb_grad = input_tensor.grad.data.squeeze().cpu()
         return gb_grad
 
-
-    def infer_model_old(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
-                    diversity_strength=0.5, top_k=0, top_p=0.9, temperature=1.0, k=1):
-
-        vocab_inv_dict = {v: k for k, v in Straw.vocab_dict.items()}
-        results = {}
-
-        for batch_idx, (images, paths) in tqdm(enumerate(data_loader)):
-            images = images.to(self.device)
-            for i in range(len(images)):
-                results[paths[i]] = {}
-                results[paths[i]]["output"] = []
-                output, act1, act2 = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],
-                                    beam_width=beam_width, max_len=Straw.maxlen_word, length_norm=length_norm, mode=infer_mode,
-                                    num_groups=num_groups, diversity_strength=diversity_strength, top_k=top_k, top_p=top_p, temperature=temperature,
-                                    k=k)
-                results[paths[i]]["act1"] = act1.cpu().detach().numpy()
-                results[paths[i]]["act2"] = act2.cpu().detach().numpy()
-                results[paths[i]]["conv1"] =self.model.encoder.conv1.weight
-                results[paths[i]]["conv2"] =self.model.encoder.conv2.weight
-                saliency = Straw.get_saliency_map(images[i].unsqueeze(0), self.model.encoder)
-                sensitivity = Straw.occlusion_sensitivity(images[i].unsqueeze(0), self.model.encoder)
-                gb_grad = Straw.getguidedbackprop(images[i].unsqueeze(0), self.model.encoder)
-                results[paths[i]]["saliency"] = saliency
-                results[paths[i]]["sensitivity"] = sensitivity
-                results[paths[i]]["gb_grad"] = gb_grad
-                output = output
-                for out in output:
-                    out = out.cpu()
-                    decoded = ''.join([vocab_inv_dict[idx.item()] for idx in out[:-1]])
-                    results[paths[i]]["output"].append(decoded)
-        return results
 
     def infer_model(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
                     diversity_strength=0.5, top_k=0, top_p=0.9, temperature=1.0, k=1):

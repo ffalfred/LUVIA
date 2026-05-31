@@ -128,9 +128,22 @@ class Tongue:
             for k, val in wbucket.items():
                 bucket.extend(val)
             final_buckets.append(bucket)
-        # Generate a sample of sentences
-        all_combinations = list(product(*final_buckets))
-        sampled_sentences = random.sample(all_combinations, min(sample_min, len(all_combinations)))
+        # Sample combinations without materializing the full cartesian product.
+        # A 10-slot sentence with ~5 candidates each is ~10M tuples; the old
+        # list(product(*buckets)) could OOM before random.sample even ran.
+        # Instead we sample distinct flat indices into the implicit combination
+        # space and decode each one back to a tuple.
+        if not final_buckets or any(len(b) == 0 for b in final_buckets):
+            return []
+        total = math.prod(len(b) for b in final_buckets)
+        n_sample = min(sample_min, total)
+        sampled_sentences = []
+        for flat_idx in random.sample(range(total), n_sample):
+            combo = []
+            for b in final_buckets:
+                combo.append(b[flat_idx % len(b)])
+                flat_idx //= len(b)
+            sampled_sentences.append(tuple(combo))
         sentences = [' '.join(words) for words in sampled_sentences]
         return sentences
 
@@ -269,13 +282,24 @@ class Tongue:
             else:
                 continue
         structure_sel = random.choice(possible_structures)
+        function_words = self.character_features.get("function_words", {})
         refined_sentence = []
         for idx, bucket in enumerate(sentence):
+            pos_tag = structure_sel[idx]
             refined_bucket = {}
-            for word in bucket:
-                refined_words = self.dictmatch_module.find_closest_POSmatch(
-                                                word, structure_sel[idx], n=candidates)
-                refined_bucket[word] = refined_words
+            if pos_tag in function_words:
+                # Function-word slot (DET, PRON, PREP, CONJ, AUX, MOD, NEG, ...):
+                # fill from the character's own vocabulary rather than matching
+                # the predicted shorthand word. This is what gives each agent
+                # its distinct grammatical voice.
+                refined_bucket[pos_tag] = list(function_words[pos_tag])
+            else:
+                # Content-word slot (NOUN, VERB, ADJ): match the predicted
+                # shorthand word to dictionary words of that POS.
+                for word in bucket:
+                    refined_words = self.dictmatch_module.find_closest_POSmatch(
+                                                    word, pos_tag, n=candidates)
+                    refined_bucket[word] = refined_words
             refined_sentence.append(refined_bucket)
         return refined_sentence
 
@@ -403,7 +427,19 @@ class Tongue:
                 entry["sentence"] = entry["sentence"].replace('"', '')
                 if entry["perplexity"] >= quantile_sel[0] and entry["perplexity"] <= quantile_sel[1]:
                     quantile_sentences.append(entry)
-            sentences_meta = random.sample(sentences, k)
+            # Draw the final sentences from the quantile bucket so the chosen
+            # perplexity band actually drives selection. If the bucket holds
+            # fewer than k, top up with the next-best sentences by perplexity
+            # so the caller still receives k results.
+            if len(quantile_sentences) >= k:
+                sentences_meta = random.sample(quantile_sentences, k)
+            else:
+                sentences_meta = list(quantile_sentences)
+                chosen_ids = {id(s) for s in sentences_meta}
+                remainder = sorted(
+                    (s for s in sentences if id(s) not in chosen_ids),
+                    key=lambda x: x["perplexity"])
+                sentences_meta.extend(remainder[:k - len(sentences_meta)])
             sentences_meta.sort(key=lambda x: x["perplexity"])
         return sentences_meta
 
