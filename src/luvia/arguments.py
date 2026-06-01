@@ -151,24 +151,7 @@ class LUVIAargs():
         LUVIAargs.hoofh_args(main_parser)
         LUVIAargs.straw_args(main_parser)
         LUVIAargs.tongue_args(main_parser)
-        ## Clean
-        clean_parser = subparsers.add_parser("clean", help="Run the clean function")
-        LUVIAargs.default_args(clean_parser)
-        LUVIAargs.clean_args(clean_parser)
-        ## Tongue
-        tongue_parser = subparsers.add_parser("tongue", help="Run the tongue function")
-        LUVIAargs.default_args(tongue_parser)
-        LUVIAargs.tongue_args(tongue_parser)
-        ## Hoof
-        hoof_parser = subparsers.add_parser("hoof", help="Run the hoof function")
-        LUVIAargs.default_args(hoof_parser)
-        LUVIAargs.hoofv_args(hoof_parser)
-        LUVIAargs.hoofh_args(hoof_parser)
-        ## Straw
-        straw_parser = subparsers.add_parser("straw", help="Run the straw function")
-        LUVIAargs.default_args(straw_parser)
-        LUVIAargs.straw_args(straw_parser)
-        ## Spiral
+        ## Horde
         horde_parser = subparsers.add_parser("horde", help="Run the horde function")
         LUVIAargs.default_args(horde_parser)
         LUVIAargs.horde_args(horde_parser)

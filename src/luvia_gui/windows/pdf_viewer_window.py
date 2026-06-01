@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPus
 from PyQt6.QtPdfWidgets import QPdfView
 from PyQt6.QtPdf import QPdfDocument
 from PyQt6.QtCore import QPointF
-from app_state import AppState
+from luvia_gui.app_state import AppState
 
 class PDFViewerWindow(QMainWindow):
     def __init__(self, app_state: AppState):

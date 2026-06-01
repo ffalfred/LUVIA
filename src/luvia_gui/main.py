@@ -1,6 +1,6 @@
 
 from PyQt6.QtWidgets import QApplication
-from app_state import AppState
+from luvia_gui.app_state import AppState
 from luvia_gui.windows.main_control import MainControlWindow
 from luvia_gui.windows_manager import WindowManager
 from luvia_gui.styles import apply_dark_theme_main

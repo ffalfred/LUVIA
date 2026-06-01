@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from luvia_gui.windows.pdf_viewer_window import PDFViewerWindow
 from luvia_gui.windows.image_viewer_window import ImageViewerWindow
-from app_state import AppState
+from luvia_gui.app_state import AppState
 
 class PDFImageCombinedWindow(QMainWindow):
     def __init__(self, app_state: AppState):

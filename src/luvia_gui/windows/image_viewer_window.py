@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QPixmap
-from app_state import AppState
+from luvia_gui.app_state import AppState
 
 from PIL import Image
 import os
@@ -127,7 +127,13 @@ class ImageViewerWindow(QMainWindow):
         if self.dragging:
             delta = event.pos() - self.drag_start_position
             self.drag_start_position = event.pos()
-            self.image_label.move(self.image_label.pos() + delta)
+            # Inside a QScrollArea the label's geometry is layout-managed;
+            # moving the label has no effect. Pan by adjusting the scroll
+            # bars instead (same approach as ImageView's comparison panel).
+            self.scroll_area.horizontalScrollBar().setValue(
+                self.scroll_area.horizontalScrollBar().value() - delta.x())
+            self.scroll_area.verticalScrollBar().setValue(
+                self.scroll_area.verticalScrollBar().value() - delta.y())
 
 
     def mousePressEvent(self, event: QMouseEvent):

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
 from PyQt6.QtGui import QFont
-from style_helpers import style_button, style_tabs, apply_fonts
+from luvia_gui.style_helpers import style_button, style_tabs, apply_fonts
 
 from luvia_gui.config.options_config import categories
 from luvia_gui.backend.backend_worker import BackendWorker

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=LUVIA
+GenericName=Linguistic Understanding via Image Analysis
+Comment=LUVIA is a stage. LUVIA has human parts. LUVIA finds.
+Exec=/home/alfredff/Bio_Software/miniconda3/envs/luvia_py311/bin/luvia-gui
+Icon=/home/alfredff/Playground/LUVIA/src/luvia_gui/gifs/signal-2025-08-25-003555_003.png
+Terminal=false
+Categories=Graphics;Science;
+StartupWMClass=LUVIA

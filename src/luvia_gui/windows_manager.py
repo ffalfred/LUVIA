@@ -1,7 +1,7 @@
 import os
 from PyQt6.QtWidgets import QMainWindow, QApplication
 
-from app_state import AppState
+from luvia_gui.app_state import AppState
 from luvia_gui.windows.image_viewer_window import ImageView
 from luvia_gui.windows.json_viewer_window import HistoryView
 

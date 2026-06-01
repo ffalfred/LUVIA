@@ -10,7 +10,7 @@ from luvia_gui.windows.pdf_viewer_window import PDFViewerWindow
 from luvia_gui.windows.image_viewer_window import ImageViewerWindow
 from luvia_gui.backend.pipeline_worker import PipelineRunner
 from luvia_gui.components.loop_mode_view import LoopModeView
-from app_state import AppState
+from luvia_gui.app_state import AppState
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSizePolicy
 from PyQt6.QtGui import QPixmap, QTransform

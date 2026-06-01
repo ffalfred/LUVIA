@@ -23,12 +23,9 @@ class CancelledError(Exception):
 class LUVIA:
 
     def __init__(self, inverted_img, out_folder, user, mode="main"):
-        if mode in ["main", "tongue", "hoof", "straw", "horde"]:
-            self.mode = mode
-            if mode != "main" and mode != "horde":
-                raise ValueError("Not yet implemented!!!")
-        else:
+        if mode not in ("main", "horde"):
             raise ValueError("Mode {} not available".format(mode))
+        self.mode = mode
 
         self.inverted_img = inverted_img
         self.number_proc = 0
@@ -371,12 +368,7 @@ def run_from_args(largs, on_event=None, should_cancel=None):
     ## Commands ##
     l = LUVIA(inverted_img=largs.inverted_image, out_folder=largs.output,
               user=largs.user, mode=largs.command)
-    if largs.command == "clean":
-        l.clean(clean_image_mode=largs.clean_mode, clean_args=clean_args)
-    elif largs.command == "hoof":
-        l.hoof(rotate_image=largs.rotate_img, extract_images=largs.hoofh_mode, extract_lines_args=largs.hoofh_args,
-               extract_character_args=LUVIAargs.extract_group_args(largs, "hoofh"))
-    elif largs.command == "main":
+    if largs.command == "main":
         l.main(image_path=largs.input, rotate_image=largs.rotate_img, clean_image_mode=largs.clean_mode,
                 clean_args=clean_args, extract_images=largs.hoofh_mode, extract_lines_args=hoofh_args,
                 extract_character_args=LUVIAargs.extract_group_args(largs, "hoofh"),
