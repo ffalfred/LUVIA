@@ -11,7 +11,10 @@ import torch
 import json
 import random
 import numpy as np
-import ety
+try:
+    import ety  # etymology lookup; optional -- absent in slim bundles
+except Exception:
+    ety = None
 import string
 import math
 
@@ -380,7 +383,13 @@ class Tongue:
                         synonyms.add(lemma.name())
                         if lemma.antonyms():
                             antonyms.update([ant.name() for ant in lemma.antonyms()])
-                etymology = [str(origin) for origin in ety.origins(word, recursive=True)]
+                if ety is not None:
+                    try:
+                        etymology = [str(origin) for origin in ety.origins(word, recursive=True)]
+                    except Exception:
+                        etymology = []
+                else:
+                    etymology = []
                 word_info[word] = {
                     'definition': definition,
                     'synonyms': list(synonyms),
