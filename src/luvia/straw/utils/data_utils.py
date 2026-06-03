@@ -1,10 +1,6 @@
-import pandas as pd
 import numpy as np
 import os
-
-from skimage.transform import resize
-import skimage.io as img_io
-import skimage.color as img_color
+import cv2
 
 import torch
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
@@ -62,8 +58,12 @@ class Shorthand_Data(Dataset):
 
 class Shorthand_Dataset(Dataset):
 
-    def __init__(self, basefolder: str = 'IAM/', metadata:str = None, subset: str = 'train', fixed_size=(48, 56), 
+    def __init__(self, basefolder: str = 'IAM/', metadata:str = None, subset: str = 'train', fixed_size=(48, 56),
                     transforms: list = None, character_classes: list = None, max_length = 21, rnd_subset = False):
+
+        # pandas is only needed by the training-dataset path (Shorthand_Dataset);
+        # importing lazily keeps it out of the inference-only bundle.
+        import pandas as pd
 
         self.basefolder = basefolder
         self.subset = subset
@@ -106,6 +106,7 @@ class Shorthand_Dataset(Dataset):
         return char_to_num, num_to_char
 
     def create_weights(self, file_freq=None):
+        import pandas as pd
         cols = ["Noun","Verb","Adjective","Adverb","Preposition","Foreign","Pronoun","Interjection",
                 "Conjunction","Determiner","Numeral","Particle","Other","Existential"]
         if file_freq is not None:
@@ -184,16 +185,15 @@ class Shorthand_Dataset(Dataset):
 
     @staticmethod
     def load_image(image_path):
-
-        # read the image
-        image = img_io.imread(image_path,as_gray=True)
-
-        # convert to grayscale skimage
-        if len(image.shape) == 3:
-            image = img_color.rgb2gray(image)
-        # normalize the image
+        # cv2.IMREAD_GRAYSCALE returns a 2-D uint8 array regardless of source
+        # channels, so we can skip the original rgb2gray fallback. Normalise
+        # to [0, 1] float and invert to match the training convention
+        # (strokes high, background low).
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise FileNotFoundError(image_path)
+        image = image.astype(np.float32) / 255.0
         image = 1 - image
-
         return image
 
     @staticmethod
@@ -202,9 +202,12 @@ class Shorthand_Dataset(Dataset):
         n_height = min(h_target - 2 * border_size, img.shape[0])
         scale = n_height / img.shape[0]
         n_width = min(w_target - 2 * border_size, int(scale * img.shape[1]))
-        # resize the image
-        img = resize(image=img, output_shape=(n_height, n_width)).astype(np.float32)
-        # right pad image to input_size
+        # uint8 inputs (from the segmentation pipeline) need to be normalised
+        # to [0, 1] float; float inputs (from load_image) pass through.
+        if img.dtype == np.uint8:
+            img = img.astype(np.float32) / 255.0
+        # cv2.resize takes (width, height) -- note the swap from skimage.
+        img = cv2.resize(img, (n_width, n_height), interpolation=cv2.INTER_LINEAR).astype(np.float32)
         img  = np.pad(img, ((border_size, h_target - n_height - border_size), (border_size, w_target - n_width - border_size),),
                         mode='constant', constant_values=0)
         return img
@@ -247,6 +250,7 @@ class Shorthand_Dataset(Dataset):
         return A.Compose(aug_lst)
 
 if __name__== "__main__":
+    import pandas as pd
     aug_transforms = Shorthand_Dataset.augmentation_functions()
     train_create = Shorthand_Dataset(basefolder="../../../../../data/gregg_definitive/", metadata="../../utils/greggs_metadata.tsv",
                                     subset='train', max_length = 21, rnd_subset = False, transforms=aug_transforms)

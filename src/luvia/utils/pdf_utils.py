@@ -23,7 +23,7 @@ from reportlab.lib.utils import ImageReader
 
 
 class FormalReport:
-    def __init__(self, filename="formal_report.pdf", location="Unknown", agent="Unknown"):
+    def __init__(self, filename="formal_report.pdf", location="Unknown", agent=None):
         self.filename = filename
         self.PAGE_WIDTH, self.PAGE_HEIGHT = A4
         self.MARGIN = 20 * mm
@@ -43,7 +43,11 @@ class FormalReport:
         self.footer_logo_path = "{}/gifs/signal-2025-08-23-160817_002.png".format(os.path.dirname(os.path.abspath(__file__)))
         self.logo_path = "{}/gifs/signal-2025-08-25-003555_002.png".format(os.path.dirname(os.path.abspath(__file__)))
         self.location = location
-        self.agent = agent.split("_")[0]
+        # agent is the character profile filename (e.g. "edith_syntax_profile.json")
+        # and the display name is the part before the first "_". For runs that
+        # don't have a named character (vanilla / equal_POS dictionary modes)
+        # the agent field is rendered blank.
+        self.agent = agent.split("_")[0] if agent else ""
         self.styles_list= getSampleStyleSheet()
 
     def _init_styles(self):

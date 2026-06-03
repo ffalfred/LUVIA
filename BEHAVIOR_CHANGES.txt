@@ -1,0 +1,170 @@
+Possible behavior changes introduced during the 1.0 refactor
+============================================================
+
+This file lists every change since the v0.2.3-pre-refactor tag that may
+shift LUVIA's algorithmic output. "Output" means the final PDF / JSONL /
+visualizations.
+
+Categories:
+  [FIX]         bug fix -- new behavior matches documented or inferred intent
+  [DRIFT]       subtle numerical change; output values shift slightly
+  [SWAP]        whole model / library replaced; output values may shift noticeably
+  [INTENTIONAL] explicitly requested or approved by user
+  [REVERTED]    was changed during the refactor, then reverted
+  [NOT CHANGED] flagged but deliberately left alone
+
+
+CNN inference (luvia.straw)
+---------------------------
+
+[DRIFT] CNN weights stored as float16 on disk, upcast to float32 at load.
+        ~1% relative precision loss on the weights themselves. Character
+        predictions from the CNN may shift slightly.
+
+[DRIFT] Character images resized with cv2.INTER_LINEAR instead of
+        skimage.transform.resize (antialiased bilinear). Pixel values fed
+        to the CNN differ slightly, so predictions may shift.
+
+[DRIFT] occlusion_sensitivity, get_saliency_map and getguidedbackprop now
+        run the encoder in model.eval() instead of model.train() so the
+        batching trick is mathematically valid. BatchNorm uses running
+        statistics instead of per-sample stats. The explainability
+        visualisations (saliency / sensitivity / gb_grad maps) will have
+        different numerical values. The CNN's character predictions are
+        NOT affected because the decoder's infer() path is unchanged.
+
+
+Language model (luvia.tongue)
+-----------------------------
+
+[SWAP]  distilgpt2 replaces gpt2 for perplexity scoring (~83M vs ~124M
+        parameters). Perplexity values are completely different (different
+        model); quantile bucket composition and final sentence selection
+        will shift.
+
+[FIX]   get_sentence("quantile") now samples from the quantile bucket. The
+        buggy version sampled from the full candidate list, silently
+        behaving like "random". Selected sentences tend to have lower
+        perplexity (the 5th-percentile default is uncanny phrasings).
+
+[FIX]   dictmatch_schemePOS now fills function-word slots (DET, PRON, AUX,
+        CONJ, NEG, ...) from the character's own function_words list
+        instead of POS-matching the predicted shorthand word against the
+        dictionary. Agents (Edith/Harold/Zoe) sound more distinct.
+
+[FIX]   Tongue() no longer crashes for match_mode="vanilla" or
+        match_mode="equal_POS". The unpack `None = self.character_features,
+        self.character` is replaced with explicit `None, None`.
+
+
+PDF / report (luvia.utils.pdf_utils)
+------------------------------------
+
+[FIX]   FormalReport(agent=None) renders an empty "Agent: " header instead
+        of crashing on .split("_"). Affects non-character_POS runs where no
+        agent persona is selected.
+
+
+CLI / dispatcher
+----------------
+
+[FIX]   OTSA cleaning args now flow through to Eyes_OTSU_Clean. The
+        dispatcher used to look up "clean_OTSA" but the actual key is
+        "clean_otsa", so all tuned OTSA parameters were silently dropped
+        and the defaults ran. Tuning the OTSA sliders / CLI flags now
+        actually changes output.
+
+[FIX]   Three dropped ValueErrors in luvia.main are now raised: the mode
+        whitelist actually rejects bad modes, the inverted-or-vs-and check
+        actually rejects unimplemented modes, and _extract_sentences
+        rejects unknown extract_sentences values. All three were silently
+        constructed and discarded before.
+
+[FIX]   The unimplemented subcommands (clean / hoof / tongue / straw) are
+        removed from argparse entirely. `luvia --help` only shows main and
+        horde. Constructing LUVIA with one of those modes now raises.
+
+[FIX]   cv2-int-only CLI args (--block_size, --blur_kernel_size,
+        --min_vertices, --contour_min_vertices, --iterations) parse as
+        int. Was producing "'float' object cannot be interpreted as an
+        integer" TypeError in production.
+
+
+GUI (luvia_gui)
+---------------
+
+[INTENTIONAL] GUI runs the pipeline in-process via PipelineWorker (QThread)
+              instead of shelling out to the luvia CLI. Stop button drives
+              a cancel flag the pipeline checks at stage boundaries. Models
+              loaded once per process and reused across runs. Algorithmic
+              output is identical to the CLI's -- the same run_from_args
+              dispatcher is invoked.
+
+[INTENTIONAL] Dark theme actually applies to the QApplication. Cosmetic.
+
+[INTENTIONAL] Image viewer drag-to-pan now works (scrollbar adjustment
+              instead of the no-op label.move). Cosmetic.
+
+[INTENTIONAL] Aux windows for loop mode are owned by WindowManager and
+              react to mode_changed / output_folder_changed signals
+              instead of file-polling timers. No algorithmic change.
+
+
+Not changed (flagged, deliberately left alone)
+----------------------------------------------
+
+[NOT CHANGED] Augmentation at inference time (per the --notransform_input
+              default flowing to transforms=True) confirmed as
+              chaos-as-art. Albumentations stays in the bundle and
+              applies to every inference image. The variable name lies
+              but the behavior is intentional.
+
+[NOT CHANGED] Various pre-existing latent bugs in named-but-dead code
+              (Tongue.syntactic_score, Tongue.rerank_beam_search,
+              Tongue.analyze_words, Straw.distance_annotations,
+              Hoofs.load_image). Never called from the active path; left
+              as breadcrumbs in case the author wants to finish them.
+
+[NOT CHANGED] The model is left in train() mode for the decoder's infer()
+              call. BatchNorm uses per-sample stats for the CNN's character
+              predictions. (Only the explainability methods now flip to
+              eval() internally.)
+
+
+Reverted (was changed during the refactor, now back to original)
+----------------------------------------------------------------
+
+[REVERTED] DictMatch.find_closest_POSmatch -- the pandas-drop rewrite
+           briefly added an "if pos_words: ... else: all_words" silent
+           fallback when a POS bucket was empty. Reverted. Original
+           behavior restored: if predicted_pos maps to a real general POS
+           but the bucket happens to be empty, the candidate list stays
+           empty and difflib returns no match. The KeyError fallback (for
+           spaCy tags not in the map) is preserved because it was in the
+           original.
+
+
+Things that did NOT change behavior (verified)
+----------------------------------------------
+
+- create_sentences no longer materializes the full cartesian product;
+  uses random.sample over the implicit index space and decodes. Same
+  random distribution, no OOM risk on long sentences.
+
+- pandas dropped from distance.py via _WordIndex. Same words returned,
+  same per-POS lists.
+
+- spaCy nlp.pipe batching in analyze_sentences. Documents are identical
+  to per-sentence nlp() output.
+
+- Batched GPT-2 perplexity computation. Mathematically equivalent to
+  per-sentence forwards (padding masked, per-sample averaging).
+
+- NLTK download moved from import time to first construction
+  (_ensure_nltk_data). Same corpora end up loaded.
+
+- spaCy / GPT-2 / grammar corrector cached at module scope. Same model
+  weights, same outputs.
+
+- Model whitelist simplification ((`mode not in ("main", "horde")` raise).
+  Same accepted modes as before the broken subparsers were removed.

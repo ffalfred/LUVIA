@@ -11,10 +11,7 @@ import torch
 import json
 import random
 import numpy as np
-try:
-    import ety  # etymology lookup; optional -- absent in slim bundles
-except Exception:
-    ety = None
+import ety
 import string
 import math
 
@@ -32,7 +29,6 @@ from luvia.tongue.distance import DictMatch
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-from deepmultilingualpunctuation import PunctuationModel
 from deep_translator import GoogleTranslator
 
 
@@ -51,8 +47,11 @@ def _get_spacy():
 
 def _get_gpt2():
     if "gpt2_model" not in _MODEL_CACHE:
-        _MODEL_CACHE["gpt2_tokenizer"] = GPT2TokenizerFast.from_pretrained("gpt2")
-        _MODEL_CACHE["gpt2_model"] = GPT2LMHeadModel.from_pretrained("gpt2")
+        # distilgpt2 is a ~83M-param distilled GPT-2; smaller (~150 MB) and
+        # faster than gpt2 (~124M params) at perplexity scoring with similar
+        # ranking quality. Same tokenizer as gpt2.
+        _MODEL_CACHE["gpt2_tokenizer"] = GPT2TokenizerFast.from_pretrained("distilgpt2")
+        _MODEL_CACHE["gpt2_model"] = GPT2LMHeadModel.from_pretrained("distilgpt2")
     return _MODEL_CACHE["gpt2_tokenizer"], _MODEL_CACHE["gpt2_model"]
 
 
@@ -79,7 +78,7 @@ class Tongue:
             if match_mode == "character_POS":
                 self.character_features, self.character = Tongue.load_character(character)
             else:
-                self.character_features, self.character = None, ""
+                self.character_features, self.character = None, None
         else:
             self.dictmatch_module = None
         self.match_mode = match_mode
@@ -136,8 +135,6 @@ class Tongue:
         # list(product(*buckets)) could OOM before random.sample even ran.
         # Instead we sample distinct flat indices into the implicit combination
         # space and decode each one back to a tuple.
-        if not final_buckets or any(len(b) == 0 for b in final_buckets):
-            return []
         total = math.prod(len(b) for b in final_buckets)
         n_sample = min(sample_min, total)
         sampled_sentences = []
@@ -150,13 +147,39 @@ class Tongue:
         sentences = [' '.join(words) for words in sampled_sentences]
         return sentences
 
-    # Function to calculate perplexity
-    def calculate_perplexity(self,sentence):
-        inputs = self.tokenizer(sentence, return_tensors="pt")
+    def calculate_perplexities(self, sentences):
+        """Batched GPT-2 perplexity for a list of sentences.
+
+        One forward pass with padded inputs replaces N per-sentence forwards.
+        Per-sample loss is averaged over non-pad tokens so each sentence's
+        perplexity is independent of how long its batchmates are.
+        """
+        if not sentences:
+            return []
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        inputs = self.tokenizer(sentences, return_tensors="pt",
+                                padding=True, truncation=True, max_length=512)
         with torch.no_grad():
-            outputs = self.model(**inputs, labels=inputs["input_ids"])
-        loss = outputs.loss.item()
-        return math.exp(loss)
+            outputs = self.model(**inputs)
+        logits = outputs.logits
+        labels = inputs["input_ids"]
+
+        # Causal LM shift: predict position t+1 from positions 0..t.
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+
+        pad_id = self.tokenizer.pad_token_id
+        losses = torch.nn.functional.cross_entropy(
+            shift_logits.view(-1, shift_logits.size(-1)),
+            shift_labels.view(-1),
+            reduction="none",
+            ignore_index=pad_id,
+        ).view(shift_labels.size())
+
+        mask = (shift_labels != pad_id).float()
+        per_sample_loss = (losses * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1)
+        return torch.exp(per_sample_loss).tolist()
 
 
     @staticmethod
@@ -203,12 +226,14 @@ class Tongue:
         return scored_candidates[0][0]
 
     def analyze_sentences(self, sentences):
-        # Analyze sentences
+        # spaCy's pipe() shares parsing pipeline state across documents and
+        # internally batches tokenisation, giving ~2x over per-sentence nlp().
+        docs = list(self.nlp.pipe(sentences))
+        # GPT-2 perplexity is batched in one padded forward instead of N.
+        perplexities = self.calculate_perplexities(sentences)
         results = []
-        for sentence in sentences:
-            doc = self.nlp(sentence)
+        for sentence, doc, perplexity in zip(sentences, docs, perplexities):
             syntax_info = [(token.text, token.dep_, token.head.text) for token in doc]
-            perplexity = self.calculate_perplexity(sentence)
             results.append({
                 "sentence": sentence,
                 "syntax": syntax_info,
@@ -285,7 +310,7 @@ class Tongue:
             else:
                 continue
         structure_sel = random.choice(possible_structures)
-        function_words = self.character_features.get("function_words", {})
+        function_words = self.character_features["function_words"]
         refined_sentence = []
         for idx, bucket in enumerate(sentence):
             pos_tag = structure_sel[idx]
@@ -318,6 +343,10 @@ class Tongue:
         return refined_sentence
     
     def punctuate(self, sentences, num_variants=5, temperature=1.):
+        # Lazy-imported because the active pipeline never calls punctuate();
+        # the module-level import was the only reason deepmultilingualpunctuation
+        # ended up in the runtime bundle.
+        from deepmultilingualpunctuation import PunctuationModel
 
         model = PunctuationModel()
         sentence_variants = []
@@ -383,13 +412,7 @@ class Tongue:
                         synonyms.add(lemma.name())
                         if lemma.antonyms():
                             antonyms.update([ant.name() for ant in lemma.antonyms()])
-                if ety is not None:
-                    try:
-                        etymology = [str(origin) for origin in ety.origins(word, recursive=True)]
-                    except Exception:
-                        etymology = []
-                else:
-                    etymology = []
+                etymology = [str(origin) for origin in ety.origins(word, recursive=True)]
                 word_info[word] = {
                     'definition': definition,
                     'synonyms': list(synonyms),

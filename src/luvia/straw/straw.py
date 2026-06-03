@@ -75,46 +75,82 @@ class Straw:
 
     @staticmethod
     def occlusion_sensitivity(image_tensor, model, patch_size=8):
+        # Sensitivity is forward-only. Switch to eval mode so BatchNorm uses
+        # running statistics (not per-sample), which lets us score every
+        # occluded patch in one batched forward pass instead of one forward
+        # per patch (~42x fewer forwards for a 48x56 image with patch_size=8).
         image_tensor = image_tensor.clone()
         _, _, H, W = image_tensor.shape
+
+        was_training = model.training
+        model.eval()
+        try:
+            with torch.no_grad():
+                base_output, _, _ = model(image_tensor)
+                base_score = base_output[0].sum().item()
+
+                patches = []
+                coords = []
+                for i in range(0, H, patch_size):
+                    for j in range(0, W, patch_size):
+                        occluded = image_tensor.clone()
+                        occluded[0, 0, i:i+patch_size, j:j+patch_size] = 0
+                        patches.append(occluded)
+                        coords.append((i, j))
+
+                batch = torch.cat(patches, dim=0)
+                outputs, _, _ = model(batch)
+                scores = outputs.reshape(outputs.size(0), -1).sum(dim=1)
+        finally:
+            if was_training:
+                model.train()
+
         sensitivity_map = torch.zeros(H, W)
-        base_output, _, _ = model(image_tensor)
-        base_score = base_output[0].sum().item()
-
-        for i in range(0, H, patch_size):
-            for j in range(0, W, patch_size):
-                occluded = image_tensor.clone()
-                occluded[0, 0, i:i+patch_size, j:j+patch_size] = 0
-                output, _, _ = model(occluded)
-                score = output[0].sum().item()
-                sensitivity_map[i:i+patch_size, j:j+patch_size] = base_score - score
-
+        for idx, (i, j) in enumerate(coords):
+            sensitivity_map[i:i+patch_size, j:j+patch_size] = base_score - scores[idx].item()
         return sensitivity_map
 
 
     @staticmethod
     def get_saliency_map(input_tensor, model):
-        # Saliency Map
-        input_tensor.requires_grad_()
-        output, _, _ = model(input_tensor)
-        score = output[0].sum()
-        score.backward()
-        saliency = input_tensor.grad.data.abs().squeeze().cpu()
-        return saliency
+        """Per-sample saliency for a batched input.
+
+        input_tensor: (N, 1, H, W) -- pass a whole batch of characters; the
+        encoder treats samples independently so one forward + one backward
+        yields per-sample gradients. Returns: (N, H, W).
+
+        Model is switched to eval() so BatchNorm uses running statistics,
+        matching the occlusion_sensitivity batching convention.
+        """
+        was_training = model.training
+        model.eval()
+        try:
+            input_tensor = input_tensor.detach().clone().requires_grad_()
+            output, _, _ = model(input_tensor)
+            output.sum().backward()
+            return input_tensor.grad.data.abs().squeeze(1).cpu()
+        finally:
+            if was_training:
+                model.train()
 
     @staticmethod
     def getguidedbackprop(input_tensor, model):
-        input_tensor.requires_grad_()
-        gb_model = GuidedBackpropModel(model)
-        output = gb_model(input_tensor)
-        score = output[0].sum()
-        # Safely zero gradients
-        if input_tensor.grad is not None:
-            input_tensor.grad.zero_()
+        """Per-sample guided backprop for a batched input.
 
-        score.backward()
-        gb_grad = input_tensor.grad.data.squeeze().cpu()
-        return gb_grad
+        Same batching/eval convention as get_saliency_map.
+        input_tensor: (N, 1, H, W); returns: (N, H, W).
+        """
+        was_training = model.training
+        model.eval()
+        try:
+            input_tensor = input_tensor.detach().clone().requires_grad_()
+            gb_model = GuidedBackpropModel(model)
+            output = gb_model(input_tensor)
+            output.sum().backward()
+            return input_tensor.grad.data.squeeze(1).cpu()
+        finally:
+            if was_training:
+                model.train()
 
 
     def infer_model(self, data_loader, infer_mode="vanilla", length_norm=True, beam_width=3, num_groups=3,
@@ -125,24 +161,33 @@ class Straw:
 
         for images, paths in data_loader:
             images = images.to(self.device)
-            for i in tqdm(range(len(images))):
-                results[paths[i]] = {}
-                results[paths[i]]["output"] = []
-                output, act1, act2 = self.model.infer(image=images[i], start_token=self.vocab_dict['<START>'], end_token=self.vocab_dict['<END>'],
-                                    beam_width=beam_width, max_len=Straw.maxlen_word, length_norm=length_norm, mode=infer_mode,
-                                    num_groups=num_groups, diversity_strength=diversity_strength, top_k=top_k, top_p=top_p, temperature=temperature,
-                                    k=k)
+            n = len(images)
+
+            # Saliency + guided backprop are batched across the whole
+            # dataloader batch -- one forward + backward each, instead of
+            # N. Sensitivity stays per-image because batching across images
+            # would multiply the already-batched patch tensor.
+            saliencies = Straw.get_saliency_map(images, self.model.encoder)
+            gb_grads = Straw.getguidedbackprop(images, self.model.encoder)
+
+            for i in tqdm(range(n)):
+                results[paths[i]] = {"output": []}
+                output, act1, act2 = self.model.infer(
+                    image=images[i],
+                    start_token=self.vocab_dict['<START>'],
+                    end_token=self.vocab_dict['<END>'],
+                    beam_width=beam_width, max_len=Straw.maxlen_word,
+                    length_norm=length_norm, mode=infer_mode,
+                    num_groups=num_groups, diversity_strength=diversity_strength,
+                    top_k=top_k, top_p=top_p, temperature=temperature, k=k)
                 results[paths[i]]["act1"] = act1.cpu().detach().numpy()
                 results[paths[i]]["act2"] = act2.cpu().detach().numpy()
-                results[paths[i]]["conv1"] =self.model.encoder.conv1.weight
-                results[paths[i]]["conv2"] =self.model.encoder.conv2.weight
-                saliency = Straw.get_saliency_map(images[i].unsqueeze(0), self.model.encoder)
-                sensitivity = Straw.occlusion_sensitivity(images[i].unsqueeze(0), self.model.encoder)
-                gb_grad = Straw.getguidedbackprop(images[i].unsqueeze(0), self.model.encoder)
-                results[paths[i]]["saliency"] = saliency
-                results[paths[i]]["sensitivity"] = sensitivity
-                results[paths[i]]["gb_grad"] = gb_grad
-                output = output
+                results[paths[i]]["conv1"] = self.model.encoder.conv1.weight
+                results[paths[i]]["conv2"] = self.model.encoder.conv2.weight
+                results[paths[i]]["saliency"] = saliencies[i]
+                results[paths[i]]["sensitivity"] = Straw.occlusion_sensitivity(
+                    images[i].unsqueeze(0), self.model.encoder)
+                results[paths[i]]["gb_grad"] = gb_grads[i]
                 for out in output:
                     out = out.cpu()
                     decoded = ''.join([vocab_inv_dict[idx.item()] for idx in out[:-1]])
@@ -185,8 +230,12 @@ class Straw:
                 path_weight = random.choice(list(Straw.weights_model.items()))[1]
             else:
                 path_weight = Straw.weights_model[model_weights]
-        self.model.load_state_dict(torch.load(path_weight, map_location=self.device,
-                                              weights_only=True))
+        state = torch.load(path_weight, map_location=self.device, weights_only=True)
+        # Weights are stored as float16 on disk to keep the bundle small;
+        # upcast to float32 for inference (BatchNorm and the rest of the CNN
+        # run in float32 on CPU and GPU).
+        state = {k: v.float() if v.is_floating_point() else v for k, v in state.items()}
+        self.model.load_state_dict(state)
     
 
 if __name__== "__main__":

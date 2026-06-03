@@ -1,14 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-import os
-from tqdm import tqdm
-from skimage.transform import resize
-from skimage import io, filters, color
-import matplotlib.pyplot as plt
-
-from scipy.ndimage import gaussian_filter1d
-from scipy.signal import argrelextrema   
 
 class Eyes_Contour_Clean:
 

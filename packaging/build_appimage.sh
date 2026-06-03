@@ -48,6 +48,9 @@ echo "==> Building ${VARIANT} variant"
 echo "==> Env:           $ENV_PATH"
 echo "==> Output:        $APPIMAGE_NAME"
 
+echo "==> Pre-downloading HF + NLTK models (skipped if cached)"
+"$ENV_PATH/bin/python" "$REPO_ROOT/packaging/download_models.py"
+
 echo "==> Running PyInstaller"
 "$PYINSTALLER" --noconfirm --clean packaging/LUVIA.spec
 
@@ -71,6 +74,13 @@ cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="${HERE}/usr/bin:${PATH}"
+# Point HF + NLTK at the bundled model cache so the app works offline.
+export HF_HOME="${HERE}/usr/bin/_internal/models_cache/hf"
+export TRANSFORMERS_CACHE="${HERE}/usr/bin/_internal/models_cache/hf"
+export HF_HUB_CACHE="${HERE}/usr/bin/_internal/models_cache/hf/hub"
+export NLTK_DATA="${HERE}/usr/bin/_internal/models_cache/nltk_data"
+# Albumentations checks for updates at import time; that hits the network.
+export NO_ALBUMENTATIONS_UPDATE=1
 exec "${HERE}/usr/bin/luvia" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"
