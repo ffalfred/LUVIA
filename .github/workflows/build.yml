@@ -1,0 +1,135 @@
+name: Build LUVIA executables
+
+# Triggers:
+#   - Manual:    Actions tab -> "Build LUVIA executables" -> Run workflow
+#   - On tag:    pushing a `v*` tag (e.g. v1.0.0) auto-builds all three OSes
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # requirements.txt pins CUDA-specific torch + nvidia-* wheels. Those
+      # don't exist for Mac/Windows and pin Linux to a fat bundle. Drop them
+      # and pull a CPU torch from PyTorch's CPU index instead -- gives us a
+      # cross-platform ~1.5 GB bundle.
+      - name: Prepare CPU-only requirements
+        shell: bash
+        run: |
+          grep -vE '^(nvidia-|triton==|torch==|torchvision==)' requirements.txt > requirements_ci.txt
+
+      - name: Install Python deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu \
+            torch==2.8.0 torchvision==0.23.0
+          pip install -r requirements_ci.txt
+          pip install -e .
+          pip install pyinstaller==6.15.0
+
+      - name: Pre-download HF + NLTK models
+        shell: bash
+        run: python packaging/download_models.py
+
+      - name: Build bundle (PyInstaller)
+        shell: bash
+        run: pyinstaller --noconfirm --clean packaging/LUVIA.spec
+
+      # --- Per-OS packaging ---
+
+      - name: Package (Linux AppImage)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p build/LUVIA.AppDir/usr/bin
+          cp -a dist/luvia/. build/LUVIA.AppDir/usr/bin/
+          cp src/luvia_gui/gifs/signal-2025-08-25-003555_003.png build/LUVIA.AppDir/luvia.png
+
+          cat > build/LUVIA.AppDir/luvia.desktop <<'EOF'
+          [Desktop Entry]
+          Name=LUVIA
+          Exec=luvia
+          Icon=luvia
+          Type=Application
+          Categories=Graphics;Science;
+          EOF
+
+          cat > build/LUVIA.AppDir/AppRun <<'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export HF_HOME="${HERE}/usr/bin/_internal/models_cache/hf"
+          export TRANSFORMERS_CACHE="${HERE}/usr/bin/_internal/models_cache/hf"
+          export HF_HUB_CACHE="${HERE}/usr/bin/_internal/models_cache/hf/hub"
+          export NLTK_DATA="${HERE}/usr/bin/_internal/models_cache/nltk_data"
+          export NO_ALBUMENTATIONS_UPDATE=1
+          exec "${HERE}/usr/bin/luvia" "$@"
+          EOF
+          chmod +x build/LUVIA.AppDir/AppRun
+
+          wget -q -O build/appimagetool \
+            "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x build/appimagetool
+          ARCH=x86_64 ./build/appimagetool build/LUVIA.AppDir dist/LUVIA-x86_64.AppImage
+
+      - name: Package (macOS DMG)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # Plain UDZO-compressed DMG. Unsigned; users get a Gatekeeper
+          # warning on first open -- right-click -> Open to bypass. Code
+          # signing is a separate paid step (Apple Developer ID, $99/yr).
+          hdiutil create -volname LUVIA -srcfolder dist/luvia \
+            -ov -format UDZO dist/LUVIA-macos.dmg
+
+      - name: Package (Windows ZIP)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/luvia/* `
+            -DestinationPath dist/LUVIA-windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LUVIA-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            dist/LUVIA-x86_64.AppImage
+            dist/LUVIA-macos.dmg
+            dist/LUVIA-windows.zip
+
+  # Optional: auto-attach artifacts to a GitHub Release when a tag is pushed.
+  release:
+    name: Attach artifacts to release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
