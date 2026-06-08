@@ -7,6 +7,7 @@ from datetime import datetime
 
 
 from luvia.arguments import LUVIAargs
+from luvia.config import PipelineConfig
 from luvia.hoof.hoof import Hoofs, Hoof_HThresh, Hoof_VThresh, ShorthandSegmenter
 from luvia.eyes.eyes import Eyes_Contour_Clean, Eyes_OTSU_Clean
 from luvia.straw.straw import Straw
@@ -146,14 +147,15 @@ class LUVIA:
         return 1 if random.random() < x else 0
 
 
-    def main(self, image_path, rotate_image=0, clean_image_mode="OTSA",
-                clean_args=dict(), extract_images="cca", extract_lines_args=dict(),
-                extract_character_args=dict(), infer_model_args=dict(),
-                sentences_model_args=dict(), random_pick=False,
+    def main(self, image_path, config, random_pick=False,
                 on_event=None, should_cancel=None):
-        # on_event(name: str, payload: dict) is called at stage boundaries.
-        # should_cancel() returning True raises CancelledError at the next
-        # stage boundary. Both default to no-ops so the CLI is unaffected.
+        """Run the full pipeline on one image.
+
+        ``config`` is a :class:`luvia.config.PipelineConfig` carrying all the
+        per-stage settings. ``on_event`` and ``should_cancel`` default to
+        no-ops so the CLI dispatcher and tests can call ``main(path, config)``
+        without extra wiring.
+        """
         on_event = on_event or (lambda name, payload=None: None)
         should_cancel = should_cancel or (lambda: False)
         def _check():
@@ -167,35 +169,38 @@ class LUVIA:
         on_event("image_loaded", {})
         _check()
 
-        if not clean_image_mode:
+        if not config.clean_mode:
             cleaned_image = self.image
         else:
             print("======================= CLEANING STREET IMAGE =======================")
-            cleaned_image = self._clean_image(image=self.image, clean_image=clean_image_mode,
-                                                clean_args=clean_args)
+            cleaned_image = self._clean_image(
+                image=self.image,
+                clean_image=config.clean_mode,
+                clean_args=config.clean.model_dump() if config.clean else {},
+            )
         on_event("cleaned", {})
         _check()
         print("======================= ROTATING STREET IMAGE =======================")
-        image_rotated = self._rotate_image(image=cleaned_image, angle=rotate_image)
+        image_rotated = self._rotate_image(image=cleaned_image, angle=config.rotate_img)
         on_event("rotated", {})
         _check()
         print("======================= EXTRACTING SMEDT SHORTHAND SENTENCES =======================")
-        image_contours, lines = self._extract_sentences(image_rotated=image_rotated,
-                                                        extract_sentences=extract_images,
-                                                        extract_lines_args=extract_lines_args)
+        image_contours, lines = self._extract_sentences(
+            image_rotated=image_rotated,
+            extract_sentences=config.hoofh_mode,
+            extract_lines_args=config.hoof_v.model_dump(),
+        )
         on_event("lines_extracted", {"count": len(lines)})
         _check()
         self.out_module.plot_alltransformations()
         straw = Straw()
-        weights_straw = infer_model_args.pop("weights")
-        notransform_input = infer_model_args.pop("notransform_input")
-        straw.load_model(weights_straw)
-        dictionary = sentences_model_args.pop("dictionary")
-        character = sentences_model_args.pop("character")
-        corrected_k = sentences_model_args.pop("corrected_k")
-        sel_sentence = sentences_model_args.pop("sel_sentence")
-        quantile = sentences_model_args.pop("quantile")
-        final_sentences = sentences_model_args.pop("final_sentences")
+        straw.load_model(config.straw.weights)
+        # Pre-compute the per-character inference kwargs (everything except
+        # the loader controls). model_dump() produces a fresh dict per main()
+        # invocation; no mutation of caller state.
+        infer_kwargs = config.straw.model_dump(exclude={"weights", "notransform_input"})
+        notransform_input = config.straw.notransform_input
+        tongue_cfg = config.tongue
         sentences_demo = []
         if random_pick:
             random.shuffle(lines)
@@ -205,20 +210,25 @@ class LUVIA:
             _check()
             on_event("line_started", {"line": line_count, "total": len(lines)})
             print("======================= TRANSLATING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
-            characters = self._extract_characters(line, line_count, extract_character_args)
+            characters = self._extract_characters(line, line_count, config.hoof_h.model_dump())
             if random_pick and LUVIA.binary_with_probability(0.4):
                 if len(characters) == 1:
                     continue
             outputs = self._translate_characters(characters, straw=straw, notransform_input=notransform_input,
-                                                line_count=line_count, infer_model_args=infer_model_args)
+                                                line_count=line_count, infer_model_args=infer_kwargs)
             if len(outputs) == 0:
                 print("Sentence {} doesnt have any character".format(line_count))
                 continue
             print("======================= MORPHING SMEDT SHORTHAND SENTENCE NUMBER {} =======================".format(line_count+1))
-            candidate_sentences, sentences_info, character_chosen = self._morph_sentence(outputs=outputs,
-                                                    dictionary=dictionary, character=character,
-                                                      corrected_k=corrected_k, sel_sentence=sel_sentence,
-                                                      quantile=quantile, final_sentences=final_sentences)
+            candidate_sentences, sentences_info, character_chosen = self._morph_sentence(
+                outputs=outputs,
+                dictionary=tongue_cfg.dictionary,
+                character=tongue_cfg.character,
+                corrected_k=tongue_cfg.corrected_k,
+                sel_sentence=tongue_cfg.sel_sentence,
+                quantile=tongue_cfg.quantile,
+                final_sentences=tongue_cfg.final_sentences,
+            )
             sentences_demo.append(sentences_info)
             on_event("line_morphed", {"line": line_count,
                                        "sentence": sentences_info[0]["sentence"] if sentences_info else ""})
@@ -229,12 +239,10 @@ class LUVIA:
                                                     word=word, sentence_info=sentences_info[0])
                 except KeyError:
                     break
-            #break
             if random_pick:
                 break
-        #self.out_module.create_pdfimage()
         location = os.path.basename(image_path).split(".")[0]
-        self.out_module.create_pdftranslation(user=self.username,character=character_chosen,
+        self.out_module.create_pdftranslation(user=self.username, character=character_chosen,
                                               sentences_data=sentences_demo, location=location)
         on_event("finished", {"output_folder": str(self.out_module.output_folder),
                                "lines_processed": len(sentences_demo)})
@@ -259,10 +267,16 @@ class LUVIA:
             f.write(json.dumps(new_entry) + "\n")
 
     
-    def horde(self, folder_streets, clean_args=dict(), extract_lines_args=dict(),
-                extract_character_args=dict(), infer_model_args=dict(), sentences_model_args=dict(),
+    def horde(self, folder_streets, config,
                 limit_loops=False, max_runs=10, num_workers=1,
                 on_event=None, should_cancel=None):
+        """Run main() over a random folder of street images in a loop.
+
+        ``config`` is a :class:`luvia.config.PipelineConfig`; this method
+        randomises ``rotate_img`` per iteration and forces ``clean_mode=OTSA``
+        and ``hoofh_mode=cca`` (the established horde defaults), leaving
+        everything else as the caller specified.
+        """
         on_event = on_event or (lambda name, payload=None: None)
         should_cancel = should_cancel or (lambda: False)
         self.out_module = OutUtils(base_folder=self.out_folder, mode=self.mode, filename="LOOP")
@@ -272,14 +286,9 @@ class LUVIA:
         dict_files = self._getstreets(folder_streets=folder_streets)
         if num_workers > 1:
             return self._horde_parallel(
-                dict_files=dict_files, clean_args=clean_args,
-                extract_lines_args=extract_lines_args,
-                extract_character_args=extract_character_args,
-                infer_model_args=infer_model_args,
-                sentences_model_args=sentences_model_args,
+                dict_files=dict_files, config=config,
                 limit_loops=limit_loops, num_workers=num_workers,
                 on_event=on_event, should_cancel=should_cancel)
-        loop_active = True
         count_runs = 0
         rotate_angles = np.arange(-180, 190, 10)
         json_path = "{}/LUVIA_history.jsonl".format(self.out_module.output_folder)
@@ -294,19 +303,21 @@ class LUVIA:
             on_event("horde_iteration_started",
                      {"count": count_runs + 1, "file": file_path, "angle": angle})
 
+            iter_config = config.model_copy(update={
+                "rotate_img": angle,
+                "clean_mode": "OTSA",
+                "hoofh_mode": "cca",
+            })
+
             main_instance = self.__class__(inverted_img=self.inverted_img,
                                             out_folder=self.out_module.output_folder,
                                             user=self.username,
                                             mode="main")
             try:
-                sentences, out_folder= main_instance.main(image_path=file_path, rotate_image=angle,
-                                                clean_image_mode="OTSA", clean_args=clean_args.copy(),
-                                                extract_images="cca", extract_lines_args=extract_lines_args.copy(),
-                                                extract_character_args=extract_character_args.copy(),
-                                                infer_model_args=infer_model_args.copy(),
-                                                sentences_model_args=sentences_model_args.copy(),
-                                                random_pick=True,
-                                                on_event=on_event, should_cancel=should_cancel)
+                sentences, out_folder = main_instance.main(
+                    image_path=file_path, config=iter_config,
+                    random_pick=True,
+                    on_event=on_event, should_cancel=should_cancel)
             except CancelledError:
                 on_event("horde_cancelled", {"count": count_runs})
                 break
@@ -351,8 +362,7 @@ class LUVIA:
                     on_event("horde_finished", {"count": count_runs})
                     break
 
-    def _horde_parallel(self, dict_files, clean_args, extract_lines_args,
-                         extract_character_args, infer_model_args, sentences_model_args,
+    def _horde_parallel(self, dict_files, config,
                          limit_loops, num_workers, on_event, should_cancel):
         """Parallel horde loop using a ProcessPoolExecutor.
 
@@ -368,15 +378,10 @@ class LUVIA:
         rotate_angles = np.arange(-180, 190, 10)
         json_path = "{}/LUVIA_history.jsonl".format(self.out_module.output_folder)
 
-        common_kwargs = {
+        init_kwargs = {
             "inverted_img": self.inverted_img,
             "out_folder": str(self.out_module.output_folder),
             "user": self.username,
-            "clean_args": dict(clean_args),
-            "extract_lines_args": dict(extract_lines_args),
-            "extract_character_args": dict(extract_character_args),
-            "infer_model_args": dict(infer_model_args),
-            "sentences_model_args": dict(sentences_model_args),
         }
 
         count_completed = 0
@@ -394,8 +399,13 @@ class LUVIA:
                 file_key = random.choice(list(dict_files.keys()))
                 file_path = dict_files[file_key]
                 angle = int(random.choice(rotate_angles))
-                fut = pool.submit(_horde_iteration_worker, file_path, angle,
-                                  file_key, common_kwargs)
+                iter_config = config.model_copy(update={
+                    "rotate_img": angle,
+                    "clean_mode": "OTSA",
+                    "hoofh_mode": "cca",
+                })
+                fut = pool.submit(_horde_iteration_worker, file_path,
+                                  file_key, init_kwargs, iter_config)
                 pending[fut] = (file_key, file_path, angle, next_iter[0])
                 on_event("horde_iteration_started",
                          {"count": next_iter[0], "file": file_path, "angle": angle})
@@ -467,29 +477,19 @@ class LUVIA:
 
 
 
-def _horde_iteration_worker(file_path, angle, file_key, common_kwargs):
+def _horde_iteration_worker(file_path, file_key, init_kwargs, iter_config):
     """Module-level worker for parallel horde -- must be picklable.
 
-    Runs one full main() iteration in a subprocess. on_event / should_cancel
-    are intentionally NOT passed across the process boundary; the parent
-    process emits events based on the returned result / raised exception.
+    Runs one full main() iteration in a subprocess. ``iter_config`` is a
+    :class:`luvia.config.PipelineConfig` already customised by the parent
+    (rotate_img, clean_mode, hoofh_mode). on_event / should_cancel are
+    intentionally NOT passed across the process boundary; the parent emits
+    events based on the returned result / raised exception.
     """
-    main_instance = LUVIA(
-        inverted_img=common_kwargs["inverted_img"],
-        out_folder=common_kwargs["out_folder"],
-        user=common_kwargs["user"],
-        mode="main",
-    )
+    main_instance = LUVIA(mode="main", **init_kwargs)
     sentences, out_folder = main_instance.main(
         image_path=file_path,
-        rotate_image=angle,
-        clean_image_mode="OTSA",
-        clean_args=dict(common_kwargs["clean_args"]),
-        extract_images="cca",
-        extract_lines_args=dict(common_kwargs["extract_lines_args"]),
-        extract_character_args=dict(common_kwargs["extract_character_args"]),
-        infer_model_args=dict(common_kwargs["infer_model_args"]),
-        sentences_model_args=dict(common_kwargs["sentences_model_args"]),
+        config=iter_config,
         random_pick=True,
     )
     return {
@@ -497,48 +497,26 @@ def _horde_iteration_worker(file_path, angle, file_key, common_kwargs):
         "out_folder": str(out_folder),
         "file_key": file_key,
         "file_path": file_path,
-        "angle": angle,
+        "angle": iter_config.rotate_img,
     }
 
 
 def run_from_args(largs, on_event=None, should_cancel=None):
     """Dispatch a parsed argparse Namespace to the right LUVIA method.
 
-    Shared by the CLI entry point and the GUI's PipelineWorker. on_event and
-    should_cancel are forwarded to LUVIA.main / LUVIA.horde (the only modes
-    that accept them); the broken hoof/clean stubs ignore them.
+    Shared by the CLI entry point and the GUI's PipelineWorker. Builds a
+    typed :class:`luvia.config.PipelineConfig` from ``largs`` and hands it
+    to ``LUVIA.main`` or ``LUVIA.horde``.
     """
-    ## Settings ##
-    if largs.clean_mode == "simple":
-        clean_args = LUVIAargs.extract_group_args(largs, "clean_simple")
-    elif largs.clean_mode == "OTSA":
-        clean_args = LUVIAargs.extract_group_args(largs, "clean_otsa")
-    else:
-        clean_args = False
-    if largs.hoofh_mode == "cca":
-        hoofh_args = LUVIAargs.extract_group_args(largs, "hoofv_cca")
-    elif largs.hoofh_mode == "threshold":
-        hoofh_args = LUVIAargs.extract_group_args(largs, "hoofv_threshold")
-    else:
-        hoofh_args = False
-
-    ## Commands ##
+    config = PipelineConfig.from_namespace(largs)
     l = LUVIA(inverted_img=largs.inverted_image, out_folder=largs.output,
               user=largs.user, mode=largs.command)
     if largs.command == "main":
-        l.main(image_path=largs.input, rotate_image=largs.rotate_img, clean_image_mode=largs.clean_mode,
-                clean_args=clean_args, extract_images=largs.hoofh_mode, extract_lines_args=hoofh_args,
-                extract_character_args=LUVIAargs.extract_group_args(largs, "hoofh"),
-                infer_model_args=LUVIAargs.extract_group_args(largs, "straw"),
-                sentences_model_args=LUVIAargs.extract_group_args(largs, "tongue"),
+        l.main(image_path=largs.input, config=config,
                 on_event=on_event, should_cancel=should_cancel)
     elif largs.command == "horde":
-        l.horde(folder_streets=largs.folder_streets, clean_args=clean_args, extract_lines_args=hoofh_args,
-                extract_character_args=LUVIAargs.extract_group_args(largs, "hoofh"),
-                infer_model_args=LUVIAargs.extract_group_args(largs, "straw"),
-                sentences_model_args=LUVIAargs.extract_group_args(largs, "tongue"),
-                limit_loops=False,
-                num_workers=largs.num_workers,
+        l.horde(folder_streets=largs.folder_streets, config=config,
+                limit_loops=False, num_workers=largs.num_workers,
                 on_event=on_event, should_cancel=should_cancel)
 
 

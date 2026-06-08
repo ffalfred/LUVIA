@@ -172,6 +172,68 @@ GROUP_MODELS = {
 
 
 # ---------------------------------------------------------------------------
+# Composed pipeline config (Phase 5 step 3)
+# ---------------------------------------------------------------------------
+
+class PipelineConfig(BaseModel):
+    """Combined typed configuration for one LUVIA.main() invocation.
+
+    Replaces the previous dict-of-dicts API (clean_args, extract_lines_args,
+    extract_character_args, infer_model_args, sentences_model_args). Built by
+    :func:`from_namespace` from a parsed argparse Namespace, or constructed
+    programmatically (GUI / tests / scripts).
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    rotate_img: float = -90.0
+    clean_mode: Optional[typing.Literal["OTSA", "simple"]] = "OTSA"
+    hoofh_mode: typing.Literal["cca", "threshold"] = "cca"
+
+    clean: Union[CleanSimpleConfig, CleanOtsaConfig, None] = None
+    hoof_v: Union[HoofVCCAConfig, HoofVThresholdConfig] = Field(default_factory=HoofVCCAConfig)
+    hoof_h: HoofHConfig = Field(default_factory=HoofHConfig)
+    straw: StrawConfig = Field(default_factory=StrawConfig)
+    tongue: TongueConfig = Field(default_factory=TongueConfig)
+
+    @classmethod
+    def from_namespace(cls, ns):
+        """Build a PipelineConfig from a parsed argparse Namespace."""
+
+        def _from_ns(model_cls):
+            return model_cls.model_validate({
+                k: getattr(ns, k)
+                for k in model_cls.model_fields.keys()
+                if getattr(ns, k, None) is not None
+            })
+
+        clean_mode = getattr(ns, "clean_mode", None)
+        if clean_mode == "OTSA":
+            clean = _from_ns(CleanOtsaConfig)
+        elif clean_mode == "simple":
+            clean = _from_ns(CleanSimpleConfig)
+        else:
+            clean = None
+
+        hoofh_mode = getattr(ns, "hoofh_mode", "cca")
+        if hoofh_mode == "threshold":
+            hoof_v = _from_ns(HoofVThresholdConfig)
+        else:
+            hoof_v = _from_ns(HoofVCCAConfig)
+
+        return cls(
+            rotate_img=getattr(ns, "rotate_img", -90.0),
+            clean_mode=clean_mode,
+            hoofh_mode=hoofh_mode,
+            clean=clean,
+            hoof_v=hoof_v,
+            hoof_h=_from_ns(HoofHConfig),
+            straw=_from_ns(StrawConfig),
+            tongue=_from_ns(TongueConfig),
+        )
+
+
+# ---------------------------------------------------------------------------
 # argparse generator
 # ---------------------------------------------------------------------------
 
