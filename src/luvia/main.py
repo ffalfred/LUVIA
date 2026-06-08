@@ -261,14 +261,24 @@ class LUVIA:
     
     def horde(self, folder_streets, clean_args=dict(), extract_lines_args=dict(),
                 extract_character_args=dict(), infer_model_args=dict(), sentences_model_args=dict(),
-                limit_loops=False, max_runs=10,
+                limit_loops=False, max_runs=10, num_workers=1,
                 on_event=None, should_cancel=None):
         on_event = on_event or (lambda name, payload=None: None)
         should_cancel = should_cancel or (lambda: False)
         self.out_module = OutUtils(base_folder=self.out_folder, mode=self.mode, filename="LOOP")
         on_event("horde_started", {"output_folder": str(self.out_module.output_folder),
-                                    "folder_streets": folder_streets})
+                                    "folder_streets": folder_streets,
+                                    "num_workers": num_workers})
         dict_files = self._getstreets(folder_streets=folder_streets)
+        if num_workers > 1:
+            return self._horde_parallel(
+                dict_files=dict_files, clean_args=clean_args,
+                extract_lines_args=extract_lines_args,
+                extract_character_args=extract_character_args,
+                infer_model_args=infer_model_args,
+                sentences_model_args=sentences_model_args,
+                limit_loops=limit_loops, num_workers=num_workers,
+                on_event=on_event, should_cancel=should_cancel)
         loop_active = True
         count_runs = 0
         rotate_angles = np.arange(-180, 190, 10)
@@ -340,8 +350,155 @@ class LUVIA:
                 if limit_loops <= count_runs:
                     on_event("horde_finished", {"count": count_runs})
                     break
+
+    def _horde_parallel(self, dict_files, clean_args, extract_lines_args,
+                         extract_character_args, infer_model_args, sentences_model_args,
+                         limit_loops, num_workers, on_event, should_cancel):
+        """Parallel horde loop using a ProcessPoolExecutor.
+
+        Each worker process loads its own copy of the models on first iteration
+        and reuses them via the module-scope cache for subsequent iterations,
+        so amortised per-iteration cost stays similar to the sequential path.
+        on_event / should_cancel are owned by this process; workers return
+        plain dicts that we surface as events.
+        """
+        import concurrent.futures
+        import multiprocessing
+
+        rotate_angles = np.arange(-180, 190, 10)
+        json_path = "{}/LUVIA_history.jsonl".format(self.out_module.output_folder)
+
+        common_kwargs = {
+            "inverted_img": self.inverted_img,
+            "out_folder": str(self.out_module.output_folder),
+            "user": self.username,
+            "clean_args": dict(clean_args),
+            "extract_lines_args": dict(extract_lines_args),
+            "extract_character_args": dict(extract_character_args),
+            "infer_model_args": dict(infer_model_args),
+            "sentences_model_args": dict(sentences_model_args),
+        }
+
+        count_completed = 0
+        next_iter = [1]
+        pending = {}
+        cancelled = [False]
+
+        def can_submit_more():
+            return not should_cancel() and (not limit_loops or next_iter[0] <= limit_loops)
+
+        mp_ctx = multiprocessing.get_context("spawn")
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers,
+                                                     mp_context=mp_ctx) as pool:
+            def submit_next():
+                file_key = random.choice(list(dict_files.keys()))
+                file_path = dict_files[file_key]
+                angle = int(random.choice(rotate_angles))
+                fut = pool.submit(_horde_iteration_worker, file_path, angle,
+                                  file_key, common_kwargs)
+                pending[fut] = (file_key, file_path, angle, next_iter[0])
+                on_event("horde_iteration_started",
+                         {"count": next_iter[0], "file": file_path, "angle": angle})
+                next_iter[0] += 1
+
+            for _ in range(num_workers):
+                if not can_submit_more():
+                    break
+                submit_next()
+
+            while pending:
+                if should_cancel() and not cancelled[0]:
+                    on_event("horde_cancelled", {"count": count_completed})
+                    cancelled[0] = True
+
+                done, _ = concurrent.futures.wait(
+                    pending.keys(), timeout=0.5,
+                    return_when=concurrent.futures.FIRST_COMPLETED)
+
+                for fut in done:
+                    file_key, file_path, angle, iter_num = pending.pop(fut)
+                    try:
+                        result = fut.result()
+                    except TypeError:
+                        on_event("horde_iteration_failed",
+                                 {"count": iter_num, "reason": "TypeError"})
+                        if can_submit_more():
+                            submit_next()
+                        continue
+
+                    try:
+                        shutil.copy(
+                            "{}/image-transformation.jpg".format(result["out_folder"]),
+                            "{}/images/image-transformation.jpg".format(
+                                self.out_module.output_folder))
+                    except FileNotFoundError:
+                        pass
+
+                    sentences = result["sentences"]
+                    out_folder = result["out_folder"]
+                    entry = {
+                        "sentence0": {
+                            "sentence": sentences[0][0]["sentence"],
+                            "probability": float(sentences[0][0]["probability"])},
+                        "sentence1": {
+                            "sentence": sentences[0][1]["sentence"],
+                            "probability": float(sentences[0][1]["probability"])},
+                        "sentence2": {
+                            "sentence": sentences[0][2]["sentence"],
+                            "probability": float(sentences[0][2]["probability"])},
+                        "location": "{}--56,24".format(file_key),
+                        "image": [
+                            "{}/images/line_images/_image_line-0.jpg".format(out_folder),
+                            "{}/images/3_contours.jpg".format(out_folder)],
+                        "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+                        "id": os.path.basename(out_folder),
+                    }
+                    self._write_jsonfile(json_path=json_path, new_entry=entry)
+                    on_event("horde_entry_written",
+                             {"count": iter_num, "entry": entry})
+                    count_completed += 1
+
+                    if can_submit_more():
+                        submit_next()
+
+        if not cancelled[0]:
+            on_event("horde_finished", {"count": count_completed})
             
 
+
+
+def _horde_iteration_worker(file_path, angle, file_key, common_kwargs):
+    """Module-level worker for parallel horde -- must be picklable.
+
+    Runs one full main() iteration in a subprocess. on_event / should_cancel
+    are intentionally NOT passed across the process boundary; the parent
+    process emits events based on the returned result / raised exception.
+    """
+    main_instance = LUVIA(
+        inverted_img=common_kwargs["inverted_img"],
+        out_folder=common_kwargs["out_folder"],
+        user=common_kwargs["user"],
+        mode="main",
+    )
+    sentences, out_folder = main_instance.main(
+        image_path=file_path,
+        rotate_image=angle,
+        clean_image_mode="OTSA",
+        clean_args=dict(common_kwargs["clean_args"]),
+        extract_images="cca",
+        extract_lines_args=dict(common_kwargs["extract_lines_args"]),
+        extract_character_args=dict(common_kwargs["extract_character_args"]),
+        infer_model_args=dict(common_kwargs["infer_model_args"]),
+        sentences_model_args=dict(common_kwargs["sentences_model_args"]),
+        random_pick=True,
+    )
+    return {
+        "sentences": sentences,
+        "out_folder": str(out_folder),
+        "file_key": file_key,
+        "file_path": file_path,
+        "angle": angle,
+    }
 
 
 def run_from_args(largs, on_event=None, should_cancel=None):
@@ -381,6 +538,7 @@ def run_from_args(largs, on_event=None, should_cancel=None):
                 infer_model_args=LUVIAargs.extract_group_args(largs, "straw"),
                 sentences_model_args=LUVIAargs.extract_group_args(largs, "tongue"),
                 limit_loops=False,
+                num_workers=largs.num_workers,
                 on_event=on_event, should_cancel=should_cancel)
 
 

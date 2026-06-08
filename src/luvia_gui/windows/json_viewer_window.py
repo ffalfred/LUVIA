@@ -78,23 +78,24 @@ class HistoryView(QWidget):
             with open(self.jsonl_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
-            scroll_bar = self.scroll_area.verticalScrollBar()
-
-            while self.scroll_layout.count():
-                item = self.scroll_layout.takeAt(0)
-                widget = item.widget()
-                if widget:
-                    widget.deleteLater()
-
-            for idx, line in enumerate(lines):
+            # Incremental: only append entries we haven't rendered yet. The
+            # JSONL is append-only in horde mode, so the widget at position k
+            # corresponds to line k. We skip already-rendered indices to avoid
+            # tearing down and rebuilding the whole scroll area on every tick.
+            already_rendered = self.scroll_layout.count()
+            new_added = False
+            for idx in range(already_rendered, len(lines)):
                 try:
-                    data = json.loads(line)
-                    entry_widget = self.create_entry_widget(idx, data)
-                    self.scroll_layout.addWidget(entry_widget)
+                    data = json.loads(lines[idx])
                 except json.JSONDecodeError:
                     continue
+                entry_widget = self.create_entry_widget(idx, data)
+                self.scroll_layout.addWidget(entry_widget)
+                new_added = True
 
-            QTimer.singleShot(0, lambda: scroll_bar.setValue(scroll_bar.maximum()))
+            if new_added:
+                scroll_bar = self.scroll_area.verticalScrollBar()
+                QTimer.singleShot(0, lambda: scroll_bar.setValue(scroll_bar.maximum()))
 
         except Exception as e:
             if self.terminal is not None:
@@ -238,41 +239,67 @@ class HistoryView(QWidget):
             terminal.output.append("[PDF Export] High-quality PDF export completed.")
 
     def export_to_pdf(self):
+        """Export the history as a paginated A4 PDF.
 
-
+        Uses QTextDocument.print() which natively paginates over a
+        QPagedPaintDevice, replacing the previous single-huge-page render of
+        the entire scroll area to one pixmap.
+        """
         file_path, _ = QFileDialog.getSaveFileName(self, "Save PDF", "", "PDF Files (*.pdf)")
         if not file_path:
             return
 
-        scale_factor = 3
-        original_size = self.scroll_content.size()
-        high_res_width = original_size.width() * scale_factor
-        high_res_height = original_size.height() * scale_factor
+        try:
+            with open(self.jsonl_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except Exception as e:
+            if self.terminal:
+                self.terminal.output.append(f"[PDF Export] Error reading history: {e}")
+            return
 
-        # Render the scroll_content to a high-resolution image
-        full_image = QPixmap(high_res_width, high_res_height)
-        full_image.fill(Qt.GlobalColor.white)
+        html_parts = [
+            "<html><body>",
+            "<h2 style='font-family: Times-Roman; text-align: center;'>Loop History Report</h2>",
+        ]
+        for idx, line in enumerate(lines):
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            s0 = data.get("sentence0", {})
+            s1 = data.get("sentence1", {})
+            s2 = data.get("sentence2", {})
+            images = data.get("image", [])
+            if isinstance(images, str):
+                images = [images]
+            html_parts.append(f"<h3>Sentence #{idx + 1}</h3>")
+            html_parts.append(
+                f"<p><b>{s0.get('sentence', '')}</b> "
+                f"<i>(probability: {s0.get('probability', 0.):.2f})</i></p>")
+            html_parts.append(
+                f"<p>{s1.get('sentence', '')} "
+                f"<i>(probability: {s1.get('probability', 0.):.2f})</i></p>")
+            html_parts.append(
+                f"<p>{s2.get('sentence', '')} "
+                f"<i>(probability: {s2.get('probability', 0.):.2f})</i></p>")
+            html_parts.append(
+                f"<p><b>Location:</b> {data.get('location', '')}<br>"
+                f"<b>Time:</b> {data.get('time', '')}<br>"
+                f"<b>ID:</b> {data.get('id', '')}</p>")
+            if images and os.path.exists(images[0]):
+                html_parts.append(
+                    f"<p><img src='file://{images[0]}' width='500'></p>")
+            html_parts.append("<hr>")
+        html_parts.append("</body></html>")
 
-        painter = QPainter(full_image)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.scale(scale_factor, scale_factor)
-        self.scroll_content.render(painter)
-        painter.end()
-
-        # Determine the actual content width by checking the rightmost edge of all direct child widgets
-        entry_widgets = [w for w in self.scroll_content.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)]
-        max_right_edge = max((w.x() + w.width()) * scale_factor for w in entry_widgets) if entry_widgets else high_res_width
-
-        # Set the page size tightly to the content width and full height
-        content_size = QSizeF(int(max_right_edge/4), int(high_res_height/2))
         pdf_writer = QPdfWriter(file_path)
-        pdf_writer.setResolution(900)
-        pdf_writer.setPageSize(QPageSize(content_size, QPageSize.Unit.Point))
+        pdf_writer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+        pdf_writer.setResolution(150)
 
-        # Write the image to the PDF
-        pdf_painter = QPainter(pdf_writer)
-        pdf_painter.drawPixmap(0, 0, full_image)
-        pdf_painter.end()
+        doc = QTextDocument()
+        doc.setHtml("\n".join(html_parts))
+        doc.print(pdf_writer)
 
         if self.terminal:
-            self.terminal.output.append("[PDF Export] PDF saved with tight content width and no entry cuts.")
+            self.terminal.output.append(
+                "[PDF Export] PDF saved (paginated A4, {} entries).".format(idx + 1 if lines else 0))

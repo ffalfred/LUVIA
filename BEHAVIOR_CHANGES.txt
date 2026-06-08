@@ -89,6 +89,44 @@ CLI / dispatcher
         int. Was producing "'float' object cannot be interpreted as an
         integer" TypeError in production.
 
+[INTENTIONAL] argparse parser is now generated from Pydantic models in
+              luvia/config.py (Phase 5 step 2). Four small CLI tightenings
+              fell out of replacing the previous hand-written choices with
+              Literal types:
+              - --clean_mode choices: ["OTSA", "simple"] (was
+                [False, "OTSA", "simple"]; False was unreachable from the
+                CLI because argparse delivers strings).
+              - --dictionary choices: ["vanilla", "equal_POS",
+                "character_POS"] (was [False, "vanilla", "equal_POS",
+                "character_POS"]; same reason -- False never matched).
+              - --filter_boxes choices: ["inside_box", "whole_img"]. Was
+                unconstrained str; only those two values were ever read
+                by the segmenter, anything else silently fell through.
+              - --filter_angle is now Optional[float] (default None) instead
+                of an untyped argparse arg (default False). Downstream still
+                uses `if angle_filtered:` to gate filtering, so None (off)
+                and any non-zero float (filter at that angle) both behave
+                as before. Edge case: --filter_angle 0 is treated as "off"
+                because 0.0 is falsy -- a pre-existing pattern, not new.
+
+[INTENTIONAL] New --num_workers flag on `luvia horde` (default 1 =
+              original sequential behavior). With num_workers > 1, horde
+              dispatches to LUVIA._horde_parallel which runs N iterations
+              concurrently via a ProcessPoolExecutor (spawn context). Per
+              iteration the OUTPUT is identical to the sequential path,
+              but with parallel mode:
+              - Per-stage events (image_loaded / cleaned / line_started /
+                line_morphed / finished) do NOT fire from workers. Only
+                outer horde events (horde_started / horde_iteration_started
+                / horde_entry_written / horde_iteration_failed /
+                horde_cancelled / horde_finished) fire from the parent.
+              - Stop: stops submitting new iterations; already-running
+                workers complete naturally. User waits for the longest
+                in-flight iteration to finish (no mid-pipeline kill).
+              - Memory: each worker holds its own spaCy + GPT-2 + grammar
+                corrector (~1-2 GB), so total RAM ~= num_workers x
+                (single-iteration footprint). Scale based on available RAM.
+
 
 GUI (luvia_gui)
 ---------------
@@ -108,6 +146,23 @@ GUI (luvia_gui)
 [INTENTIONAL] Aux windows for loop mode are owned by WindowManager and
               react to mode_changed / output_folder_changed signals
               instead of file-polling timers. No algorithmic change.
+
+[INTENTIONAL] HistoryView.load_jsonl is incremental. The previous version
+              cleared and rebuilt the whole scroll area every 3 seconds;
+              now it only appends entries whose index is beyond
+              scroll_layout.count(). Assumes the JSONL is append-only,
+              which is true for horde mode. A rewritten JSONL would leave
+              stale widgets until the window is reopened. No change to
+              what gets displayed, only when/how it gets rendered.
+
+[INTENTIONAL] HistoryView.export_to_pdf produces a paginated A4 PDF via
+              QTextDocument.print() instead of rendering the whole scroll
+              area to one giant pixmap on a custom huge-page PDF. The
+              data is identical (same three sentences + location + time +
+              ID + image per entry), but the PDF layout is different:
+              standard A4 pages with native pagination instead of a
+              single multi-meter page. Old single-pixmap approach lives
+              on as the unused export_to_pdf_high_quality breadcrumb.
 
 
 Not changed (flagged, deliberately left alone)

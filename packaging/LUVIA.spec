@@ -112,6 +112,9 @@ a = Analysis(
         # is never called from the active pipeline. The import was hoisted
         # inside the method so excluding the package here is safe.
         "deepmultilingualpunctuation",
+        # scipy -- replaced by ~20 lines of numpy in hoof.py
+        # (gaussian_filter1d + argrelextrema).
+        "scipy",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

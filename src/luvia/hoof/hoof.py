@@ -2,8 +2,39 @@ import cv2
 import numpy as np
 import math
 
-from scipy.ndimage import gaussian_filter1d
-from scipy.signal import argrelextrema
+
+def gaussian_filter1d(arr, sigma, truncate=4.0):
+    """Drop-in replacement for scipy.ndimage.gaussian_filter1d's default behaviour
+    (mode='reflect' = symmetric reflection including the boundary). ~20 lines
+    instead of dragging the whole scipy package into the bundle.
+    """
+    arr = np.asarray(arr, dtype=np.float64)
+    radius = int(truncate * sigma + 0.5)
+    if radius < 1:
+        return arr.copy()
+    x = np.arange(-radius, radius + 1)
+    kernel = np.exp(-0.5 * (x / sigma) ** 2)
+    kernel /= kernel.sum()
+    padded = np.pad(arr, radius, mode='symmetric')
+    return np.convolve(padded, kernel, mode='valid')
+
+
+def argrelextrema(arr, comparator):
+    """Drop-in replacement for scipy.signal.argrelextrema with order=1 (only
+    strict comparison against immediate neighbours, which is what hoof.py
+    uses). Returns the same single-element tuple of indices as scipy."""
+    arr = np.asarray(arr)
+    interior = arr[1:-1]
+    left = arr[:-2]
+    right = arr[2:]
+    if comparator is np.less:
+        mask = (interior < left) & (interior < right)
+    elif comparator is np.greater:
+        mask = (interior > left) & (interior > right)
+    else:
+        raise ValueError("Unsupported comparator: {}".format(comparator))
+    return (np.where(mask)[0] + 1,)
+
 
 class Hoofs:
 
