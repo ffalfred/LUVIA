@@ -14,8 +14,7 @@ import traceback
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from luvia.arguments import LUVIAargs
-from luvia.main import CancelledError, run_from_args
+from luvia.main import CancelledError, LUVIA
 
 
 class _StreamToSignal(io.TextIOBase):
@@ -53,12 +52,20 @@ class PipelineWorker(QObject):
     # status: "finished" | "cancelled" | "error"
     finished = pyqtSignal(str, dict)
 
-    def __init__(self, argv):
-        """argv: list of CLI tokens (e.g. ["main", "--input", "..."]); parsed
-        by LUVIAargs and dispatched via run_from_args, so the GUI uses the
-        exact same parsing + defaults + validation as the CLI."""
+    def __init__(self, command, config, init_kwargs, command_kwargs):
+        """Run one LUVIA invocation in a QThread.
+
+        command: "main" or "horde".
+        config: a :class:`luvia.config.PipelineConfig`.
+        init_kwargs: kwargs for ``LUVIA(...)`` (inverted_img, out_folder, user).
+        command_kwargs: kwargs for the chosen method
+            (``image_path`` for main, ``folder_streets`` + ``num_workers`` for horde).
+        """
         super().__init__()
-        self._argv = list(argv)
+        self._command = command
+        self._config = config
+        self._init_kwargs = dict(init_kwargs)
+        self._command_kwargs = dict(command_kwargs)
         self._cancel = threading.Event()
 
     def cancel(self):
@@ -76,22 +83,26 @@ class PipelineWorker(QObject):
         stderr = _StreamToSignal(self.output_line)
         try:
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                largs = LUVIAargs.main(self._argv)
-                run_from_args(largs,
-                              on_event=self._on_event,
-                              should_cancel=self._should_cancel)
+                luvia = LUVIA(mode=self._command, **self._init_kwargs)
+                if self._command == "main":
+                    luvia.main(config=self._config,
+                                on_event=self._on_event,
+                                should_cancel=self._should_cancel,
+                                **self._command_kwargs)
+                elif self._command == "horde":
+                    luvia.horde(config=self._config,
+                                 on_event=self._on_event,
+                                 should_cancel=self._should_cancel,
+                                 **self._command_kwargs)
+                else:
+                    raise ValueError("Unknown command: {}".format(self._command))
                 stdout.flush()
                 stderr.flush()
-            self.finished.emit("finished", {"command": largs.command})
+            self.finished.emit("finished", {"command": self._command})
         except CancelledError as exc:
             stdout.flush()
             stderr.flush()
             self.finished.emit("cancelled", {"reason": str(exc)})
-        except SystemExit as exc:
-            # argparse calls sys.exit on validation failure; surface as error.
-            stdout.flush()
-            stderr.flush()
-            self.finished.emit("error", {"type": "SystemExit", "message": str(exc)})
         except Exception as exc:
             stdout.flush()
             stderr.flush()
@@ -116,11 +127,11 @@ class PipelineRunner(QObject):
     def is_running(self):
         return self._thread is not None and self._thread.isRunning()
 
-    def start(self, argv):
+    def start(self, command, config, init_kwargs, command_kwargs):
         if self.is_running():
             return False
         self._thread = QThread()
-        self._worker = PipelineWorker(argv)
+        self._worker = PipelineWorker(command, config, init_kwargs, command_kwargs)
         self._worker.moveToThread(self._thread)
 
         self._thread.started.connect(self._worker.run)

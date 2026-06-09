@@ -250,3 +250,80 @@ class InputPanel(QWidget):
             QMessageBox.warning(self, "Missing Output Folder", "Please select a valid output folder.")
             return None
         return ["horde", "--folder_streets", input_folder, "--output", output_folder]
+
+    def build_config(self):
+        """Build the typed PipelineConfig + supporting kwargs straight from
+        the form, skipping the argparse round-trip.
+
+        Returns ``(command, config, init_kwargs, command_kwargs)`` or
+        ``None`` if a required path is missing.
+        """
+        from types import SimpleNamespace
+        from luvia.config import PipelineConfig
+
+        is_main_mode = self.input_file_field.isVisible()
+
+        if is_main_mode:
+            input_file = self.input_file_field.text()
+            output_folder = self.output_folder_field.text()
+            if not (input_file and os.path.isfile(input_file)):
+                QMessageBox.warning(self, "Missing Input File",
+                                    "Please select a valid input file.")
+                return None
+            if not (output_folder and os.path.isdir(output_folder)):
+                QMessageBox.warning(self, "Missing Output Folder",
+                                    "Please select a valid output folder.")
+                return None
+            command = "main"
+            command_kwargs = {"image_path": input_file}
+        else:
+            input_folder = self.input_folder_field.text()
+            output_folder = self.output_folder_field.text()
+            if not (input_folder and os.path.isdir(input_folder)):
+                QMessageBox.warning(self, "Missing Input Folder",
+                                    "Please select a valid input folder.")
+                return None
+            if not (output_folder and os.path.isdir(output_folder)):
+                QMessageBox.warning(self, "Missing Output Folder",
+                                    "Please select a valid output folder.")
+                return None
+            command = "horde"
+            command_kwargs = {"folder_streets": input_folder}
+
+        # Snapshot the form into a flat dict keyed by field name (stripping
+        # the leading --), matching the attribute names PipelineConfig
+        # expects from a parsed argparse Namespace.
+        ns_dict = {}
+        for flag, widget in self.inputs.items():
+            field = flag.lstrip("-")
+            if isinstance(widget, QCheckBox):
+                ns_dict[field] = widget.isChecked()
+            elif isinstance(widget, QLineEdit):
+                v = widget.text()
+                if v != "":
+                    ns_dict[field] = v
+            elif isinstance(widget, QComboBox):
+                ns_dict[field] = widget.currentText()
+
+        # Tuple fields come in as "N,N" strings; parse to actual tuples so
+        # Pydantic validation accepts them.
+        for tuple_field in ("blur_kernel", "dilation_kernel", "kernel_size"):
+            v = ns_dict.get(tuple_field)
+            if isinstance(v, str):
+                try:
+                    ns_dict[tuple_field] = tuple(int(x.strip()) for x in v.split(","))
+                except ValueError:
+                    QMessageBox.warning(
+                        self, "Invalid value",
+                        f"--{tuple_field}: expected 'N,N' (got {v!r})")
+                    return None
+
+        config = PipelineConfig.from_namespace(SimpleNamespace(**ns_dict))
+
+        init_kwargs = {
+            "inverted_img": bool(ns_dict.get("inverted_image", False)),
+            "out_folder": output_folder,
+            "user": ns_dict.get("user", "Anonymous") or "Anonymous",
+        }
+
+        return command, config, init_kwargs, command_kwargs

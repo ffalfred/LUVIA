@@ -260,15 +260,16 @@ class MainControlWindow(QMainWindow):
 
 
     def run_clicked(self):
-        argv = self.input_panel.build_argv()
-        if not argv:
+        built = self.input_panel.build_config()
+        if built is None:
             return  # validation message already shown by InputPanel
+        command, config, init_kwargs, command_kwargs = built
 
-        self.terminal.output.append("Running luvia " + " ".join(argv))
+        self.terminal.output.append("Running luvia {}".format(command))
         self.input_panel.run_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.spinner_timer.start()
-        if not self.pipeline_runner.start(argv):
+        if not self.pipeline_runner.start(command, config, init_kwargs, command_kwargs):
             self.terminal.output.append("Pipeline already running.")
             self.input_panel.run_button.setEnabled(True)
             self.stop_button.setEnabled(False)
